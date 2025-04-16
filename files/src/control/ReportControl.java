@@ -15,7 +15,7 @@ public class ReportControl {
      * @param filters the filters to apply
      * @return the generated report
      */
-    public entity.Report generateApplicationReport(Project project, List<Application> applications, Map<String, Object> filters) {
+    public Report generateApplicationReport(Project project, List<Application> applications, Map<String, Object> filters) {
         // Apply filters to applications
         List<Application> filteredApplications = applyFilters(applications, filters);
         
@@ -23,7 +23,7 @@ public class ReportControl {
         String reportID = "RPT-APP-" + project.getProjectID() + "-" + System.currentTimeMillis() % 10000;
         
         // Create report
-        entity.Report report = new entity.Report();
+        Report report = new Report();
         report.setReportID(reportID);
         report.setApplications(filteredApplications);
         report.setGenerationDate(new Date());
@@ -39,7 +39,7 @@ public class ReportControl {
      * @param filters the filters to apply
      * @return the generated report
      */
-    public entity.Report generateBookingReport(Project project, List<Application> applications, Map<String, Object> filters) {
+    public Report generateBookingReport(Project project, List<Application> applications, Map<String, Object> filters) {
         // Ensure only booked applications are included
         List<Application> bookedApplications = new ArrayList<>();
         for (Application app : applications) {
@@ -55,7 +55,7 @@ public class ReportControl {
         String reportID = "RPT-BOOK-" + project.getProjectID() + "-" + System.currentTimeMillis() % 10000;
         
         // Create report
-        entity.Report report = new entity.Report();
+        Report report = new Report();
         report.setReportID(reportID);
         report.setApplications(filteredApplications);
         report.setGenerationDate(new Date());
@@ -80,16 +80,21 @@ public class ReportControl {
         // Apply marital status filter
         if (filters.containsKey("maritalStatus")) {
             String maritalStatusStr = (String) filters.get("maritalStatus");
+            MaritalStatus maritalStatus = null;
             
-            // Make maritalStatus final for use in lambda
-            final MaritalStatus maritalStatus;
+            // Try to convert to enum
             try {
-                maritalStatus = MaritalStatus.fromString(maritalStatusStr);
+                if (maritalStatusStr.equalsIgnoreCase("Single")) {
+                    maritalStatus = MaritalStatus.SINGLE;
+                } else if (maritalStatusStr.equalsIgnoreCase("Married")) {
+                    maritalStatus = MaritalStatus.MARRIED;
+                }
                 
                 if (maritalStatus != null) {
-                    filteredList.removeIf(app -> app.getApplicant().getMaritalStatus() != maritalStatus);
+                    final MaritalStatus finalStatus = maritalStatus;
+                    filteredList.removeIf(app -> app.getApplicant().getMaritalStatus() != finalStatus);
                 }
-            } catch (IllegalArgumentException e) {
+            } catch (Exception e) {
                 // Invalid value, ignore filter
             }
         }
@@ -109,33 +114,52 @@ public class ReportControl {
         // Apply status filter
         if (filters.containsKey("status")) {
             String statusStr = (String) filters.get("status");
+            ApplicationStatus status = null;
             
             // Try to convert to enum
             try {
-                final ApplicationStatus status = ApplicationStatus.valueOf(statusStr.toUpperCase());
-                filteredList.removeIf(app -> app.getStatus() != status);
-            } catch (IllegalArgumentException e) {
+                if (statusStr.equalsIgnoreCase("Pending")) {
+                    status = ApplicationStatus.PENDING;
+                } else if (statusStr.equalsIgnoreCase("Successful")) {
+                    status = ApplicationStatus.SUCCESSFUL;
+                } else if (statusStr.equalsIgnoreCase("Unsuccessful")) {
+                    status = ApplicationStatus.UNSUCCESSFUL;
+                } else if (statusStr.equalsIgnoreCase("Booked")) {
+                    status = ApplicationStatus.BOOKED;
+                }
+                
+                if (status != null) {
+                    final ApplicationStatus finalStatus = status;
+                    filteredList.removeIf(app -> app.getStatus() != finalStatus);
+                }
+            } catch (Exception e) {
                 // Invalid value, ignore filter
             }
         }
         
         // Apply flat type filter (for booked applications)
         if (filters.containsKey("flatType")) {
-            final String flatTypeStr = (String) filters.get("flatType");
+            String flatTypeStr = (String) filters.get("flatType");
+            FlatType flatType = null;
             
-            // Determine flat type
-            filteredList.removeIf(app -> {
-                Flat bookedFlat = app.getBookedFlat();
-                if (bookedFlat == null) {
-                    return true;
-                }
+            // Try to convert to enum
+            try {
                 if (flatTypeStr.equalsIgnoreCase("2-Room")) {
-                    return bookedFlat.getType() != FlatType.TWO_ROOM;
+                    flatType = FlatType.TWO_ROOM;
                 } else if (flatTypeStr.equalsIgnoreCase("3-Room")) {
-                    return bookedFlat.getType() != FlatType.THREE_ROOM;
+                    flatType = FlatType.THREE_ROOM;
                 }
-                return true; // If flatTypeStr doesn't match any known type
-            });
+                
+                if (flatType != null) {
+                    final FlatType finalType = flatType;
+                    filteredList.removeIf(app -> {
+                        Flat bookedFlat = app.getBookedFlat();
+                        return bookedFlat == null || bookedFlat.getType() != finalType;
+                    });
+                }
+            } catch (Exception e) {
+                // Invalid value, ignore filter
+            }
         }
         
         return filteredList;
@@ -186,6 +210,55 @@ public class ReportControl {
             if (bookedFlat != null) {
                 FlatType type = bookedFlat.getType();
                 summary.put(type, summary.getOrDefault(type, 0) + 1);
+            }
+        }
+        
+        return summary;
+    }
+    
+    /**
+     * Create a summary of applications by age range
+     * @param applications list of applications
+     * @param ageRanges array of age ranges (e.g., [21, 30, 40, 50])
+     * @return map of age range to count
+     */
+    public Map<String, Integer> summarizeByAgeRange(List<Application> applications, int[] ageRanges) {
+        Map<String, Integer> summary = new LinkedHashMap<>();
+        
+        // Initialize the ranges
+        for (int i = 0; i < ageRanges.length; i++) {
+            String rangeStr;
+            if (i == 0) {
+                rangeStr = "Under " + ageRanges[i];
+            } else if (i == ageRanges.length - 1) {
+                rangeStr = ageRanges[i] + " and above";
+            } else {
+                rangeStr = ageRanges[i-1] + "-" + (ageRanges[i] - 1);
+            }
+            summary.put(rangeStr, 0);
+        }
+        
+        // Count applications by age range
+        for (Application app : applications) {
+            int age = app.getApplicant().getAge();
+            String rangeStr = null;
+            
+            // Find the appropriate range
+            for (int i = 0; i < ageRanges.length; i++) {
+                if (i == 0 && age < ageRanges[i]) {
+                    rangeStr = "Under " + ageRanges[i];
+                    break;
+                } else if (i == ageRanges.length - 1 && age >= ageRanges[i]) {
+                    rangeStr = ageRanges[i] + " and above";
+                    break;
+                } else if (i > 0 && age >= ageRanges[i-1] && age < ageRanges[i]) {
+                    rangeStr = ageRanges[i-1] + "-" + (ageRanges[i] - 1);
+                    break;
+                }
+            }
+            
+            if (rangeStr != null) {
+                summary.put(rangeStr, summary.getOrDefault(rangeStr, 0) + 1);
             }
         }
         

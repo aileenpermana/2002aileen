@@ -9,6 +9,7 @@ import java.util.*;
  */
 public class HDBOfficerControl {
     private static final String OFFICER_REGISTRATIONS_FILE = "files/resources/OfficerRegistrations.csv";
+    private static final String RECEIPTS_FILE = "files/resources/BookingReceipts.csv";
     private List<Map<String, Object>> officerRegistrations;
     
     /**
@@ -26,9 +27,13 @@ public class HDBOfficerControl {
     public List<Map<String, Object>> getOfficerRegistrations(HDBOfficer officer) {
         List<Map<String, Object>> registrations = new ArrayList<>();
         
+        // Also check for registrations with matching NRIC (for applicants checking their officer registrations)
+        String officerNRIC = officer.getNRIC();
+        
         for (Map<String, Object> reg : officerRegistrations) {
             HDBOfficer regOfficer = (HDBOfficer) reg.get("officer");
-            if (regOfficer.getOfficerID().equals(officer.getOfficerID())) {
+            if (regOfficer.getOfficerID().equals(officer.getOfficerID()) || 
+                regOfficer.getNRIC().equals(officerNRIC)) {
                 registrations.add(reg);
             }
         }
@@ -55,6 +60,27 @@ public class HDBOfficerControl {
     }
     
     /**
+     * Get pending officer registrations for a project
+     * @param project the project
+     * @return list of pending registration records
+     */
+    public List<Map<String, Object>> getPendingRegistrationsForProject(Project project) {
+        List<Map<String, Object>> pendingRegistrations = new ArrayList<>();
+        
+        for (Map<String, Object> reg : officerRegistrations) {
+            Project regProject = (Project) reg.get("project");
+            RegistrationStatus status = (RegistrationStatus) reg.get("status");
+            
+            if (regProject.getProjectID().equals(project.getProjectID()) && 
+                status == RegistrationStatus.PENDING) {
+                pendingRegistrations.add(reg);
+            }
+        }
+        
+        return pendingRegistrations;
+    }
+    
+    /**
      * Register an officer for a project
      * @param officer the officer
      * @param project the project
@@ -66,7 +92,7 @@ public class HDBOfficerControl {
             HDBOfficer regOfficer = (HDBOfficer) reg.get("officer");
             Project regProject = (Project) reg.get("project");
             
-            if (regOfficer.getOfficerID().equals(officer.getOfficerID()) && 
+            if (regOfficer.getNRIC().equals(officer.getNRIC()) && 
                 regProject.getProjectID().equals(project.getProjectID())) {
                 return false; // Already registered
             }
@@ -80,6 +106,12 @@ public class HDBOfficerControl {
         // Check if officer is handling another project in the same period
         if (officer.isHandlingProject(project.getApplicationOpenDate(), project.getApplicationCloseDate())) {
             return false;
+        }
+        
+        // Check if officer has applied for this project as an applicant
+        ApplicationControl appControl = new ApplicationControl();
+        if (appControl.hasApplicationForProject(officer.getNRIC(), project)) {
+            return false; // Cannot be both applicant and officer for same project
         }
         
         // Create registration record
@@ -109,8 +141,13 @@ public class HDBOfficerControl {
             HDBOfficer regOfficer = (HDBOfficer) reg.get("officer");
             Project regProject = (Project) reg.get("project");
             
-            if (regOfficer.getOfficerID().equals(officer.getOfficerID()) && 
+            if (regOfficer.getNRIC().equals(officer.getNRIC()) && 
                 regProject.getProjectID().equals(project.getProjectID())) {
+                
+                // If already has this status, nothing to do
+                if (reg.get("status") == status) {
+                    return true;
+                }
                 
                 reg.put("status", status);
                 
@@ -124,6 +161,10 @@ public class HDBOfficerControl {
                     
                     // Decrement available slots
                     project.decrementOfficerSlots();
+                    
+                    // Update project
+                    ProjectControl projectControl = new ProjectControl();
+                    projectControl.updateProject(project);
                 }
                 
                 return saveOfficerRegistrations();
@@ -140,72 +181,68 @@ public class HDBOfficerControl {
     private List<Map<String, Object>> loadOfficerRegistrations() {
         List<Map<String, Object>> loadedRegistrations = new ArrayList<>();
         
-        try (Scanner fileScanner = new Scanner(new File(OFFICER_REGISTRATIONS_FILE))) {
-            // Skip header if exists
-            if (fileScanner.hasNextLine()) {
-                fileScanner.nextLine();
+        try {
+            File registrationsFile = new File(OFFICER_REGISTRATIONS_FILE);
+            
+            // If file doesn't exist, create it with header
+            if (!registrationsFile.exists()) {
+                File parentDir = registrationsFile.getParentFile();
+                if (!parentDir.exists()) {
+                    parentDir.mkdirs();
+                }
+                
+                try (PrintWriter writer = new PrintWriter(new FileWriter(registrationsFile))) {
+                    writer.println("OfficerNRIC,ProjectID,Status,RegistrationDate");
+                }
+                return loadedRegistrations;
             }
             
-            while (fileScanner.hasNextLine()) {
-                String line = fileScanner.nextLine().trim();
-                if (line.isEmpty()) continue;
+            try (Scanner fileScanner = new Scanner(registrationsFile)) {
+                // Skip header if exists
+                if (fileScanner.hasNextLine()) {
+                    fileScanner.nextLine();
+                }
                 
-                String[] values = line.split(",");
-                if (values.length < 4) continue; // Invalid line
-                
-                // Parse registration data
-                try {
-                    String officerID = values[0].trim();
-                    String projectID = values[1].trim();
-                    String statusStr = values[2].trim();
-                    long registrationDate = Long.parseLong(values[3].trim());
+                while (fileScanner.hasNextLine()) {
+                    String line = fileScanner.nextLine().trim();
+                    if (line.isEmpty()) continue;
                     
-                    // Convert status string to enum
-                    RegistrationStatus status = RegistrationStatus.valueOf(statusStr);
+                    String[] values = line.split(",");
+                    if (values.length < 4) continue; // Invalid line
                     
-                    // Find officer and project (in a real system, these would come from repositories)
-                    // For now, create placeholders
-                    HDBOfficer officer = new HDBOfficer(
-                        "Officer " + officerID, // Placeholder name
-                        "S1234567A", // Placeholder NRIC
-                        "password",
-                        40, // Placeholder age
-                        "Married", // Placeholder marital status
-                        "HDBOfficer"
-                    );
-                    
-                    // Use reflection to set officerID (for demo purposes)
-                    java.lang.reflect.Field idField = HDBOfficer.class.getDeclaredField("officerID");
-                    idField.setAccessible(true);
-                    idField.set(officer, officerID);
-                    
-                    Project project = new Project(
-                        projectID,
-                        "Project " + projectID, // Placeholder name
-                        "Neighborhood", // Placeholder neighborhood
-                        new HashMap<>(), // Placeholder units
-                        new Date(), // Placeholder open date
-                        new Date(), // Placeholder close date
-                        null, // Placeholder manager
-                        5 // Placeholder officer slots
-                    );
-                    
-                    // Create registration record
-                    Map<String, Object> registration = new HashMap<>();
-                    registration.put("officer", officer);
-                    registration.put("project", project);
-                    registration.put("status", status);
-                    registration.put("date", new Date(registrationDate));
-                    
-                    // Add to list
-                    loadedRegistrations.add(registration);
-                    
-                } catch (Exception e) {
-                    System.err.println("Error parsing officer registration data: " + e.getMessage());
+                    // Parse registration data
+                    try {
+                        String officerNRIC = values[0].trim();
+                        String projectID = values[1].trim();
+                        String statusStr = values[2].trim();
+                        long registrationDate = Long.parseLong(values[3].trim());
+                        
+                        // Convert status string to enum
+                        RegistrationStatus status = RegistrationStatus.valueOf(statusStr);
+                        
+                        // Find or create officer
+                        HDBOfficer officer = findOrCreateOfficer(officerNRIC);
+                        
+                        // Find or create project
+                        Project project = findOrCreateProject(projectID);
+                        
+                        // Create registration record
+                        Map<String, Object> registration = new HashMap<>();
+                        registration.put("officer", officer);
+                        registration.put("project", project);
+                        registration.put("status", status);
+                        registration.put("date", new Date(registrationDate));
+                        
+                        // Add to list
+                        loadedRegistrations.add(registration);
+                        
+                    } catch (Exception e) {
+                        System.err.println("Error parsing officer registration data: " + e.getMessage());
+                    }
                 }
             }
-        } catch (FileNotFoundException e) {
-            System.out.println("Officer registrations file not found. Starting with empty list.");
+        } catch (IOException e) {
+            System.out.println("Error loading officer registrations: " + e.getMessage());
         }
         
         return loadedRegistrations;
@@ -225,7 +262,7 @@ public class HDBOfficerControl {
             
             try (PrintWriter writer = new PrintWriter(new FileWriter(OFFICER_REGISTRATIONS_FILE))) {
                 // Write header
-                writer.println("OfficerID,ProjectID,Status,RegistrationDate");
+                writer.println("OfficerNRIC,ProjectID,Status,RegistrationDate");
                 
                 // Write registrations
                 for (Map<String, Object> reg : officerRegistrations) {
@@ -235,7 +272,7 @@ public class HDBOfficerControl {
                     Date date = (Date) reg.get("date");
                     
                     writer.println(
-                        officer.getOfficerID() + "," +
+                        officer.getNRIC() + "," +
                         project.getProjectID() + "," +
                         status + "," +
                         date.getTime()
@@ -245,19 +282,165 @@ public class HDBOfficerControl {
             
             return true;
         } catch (IOException e) {
-            System.err.println("Error saving officer registrations: " + e.getMessage());
+            System.err.println("Error saving receipt: " + e.getMessage());
             return false;
         }
+    }
+    
+    /**
+     * Find an application by NRIC and project
+     * @param nric the applicant's NRIC
+     * @param project the project
+     * @return the application, or null if not found
+     */
+    public Application findApplicationByNRICAndProject(String nric, Project project) {
+        // Delegate to ApplicationControl to find the application
+        ApplicationControl appControl = new ApplicationControl();
+        return appControl.findApplicationByNRICAndProject(nric, project);
+    }
+    
+    /**
+     * Get all handled projects by an officer
+     * @param officer the HDB officer
+     * @return list of projects the officer is handling
+     */
+    public List<Project> getHandledProjects(HDBOfficer officer) {
+        List<Project> handledProjects = new ArrayList<>();
+        
+        for (Map<String, Object> reg : officerRegistrations) {
+            HDBOfficer regOfficer = (HDBOfficer) reg.get("officer");
+            Project project = (Project) reg.get("project");
+            RegistrationStatus status = (RegistrationStatus) reg.get("status");
+            
+            if (regOfficer.getNRIC().equals(officer.getNRIC()) && 
+                status == RegistrationStatus.APPROVED) {
+                handledProjects.add(project);
+            }
+        }
+        
+        return handledProjects;
+    }
+    
+    /**
+     * Reply to an enquiry
+     * @param enquiry the enquiry to reply to
+     * @param officer the officer making the reply
+     * @param replyContent the reply content
+     * @return true if reply was successful, false otherwise
+     */
+    public boolean replyToEnquiry(Enquiry enquiry, HDBOfficer officer, String replyContent) {
+        // Check if officer is handling the project
+        if (!officer.isHandlingProject(enquiry.getProject())) {
+            return false;
+        }
+        
+        // Format reply with officer info
+        String formattedReply = "HDB Officer " + officer.getName() + " [" + 
+                             officer.getOfficerID() + "]: " + replyContent;
+        
+        // Add reply to enquiry
+        EnquiryControl enquiryControl = new EnquiryControl();
+        return enquiryControl.addReply(enquiry, formattedReply, officer);
+    }
+    
+    /**
+     * Get booked applications for a project
+     * @param project the project
+     * @return list of booked applications
+     */
+    public List<Application> getBookedApplications(Project project) {
+        ApplicationControl appControl = new ApplicationControl();
+        return appControl.getBookedApplications(project);
+    }
+    
+    /**
+     * Get successful (approved but not yet booked) applications for a project
+     * @param project the project
+     * @return list of successful applications
+     */
+    public List<Application> getSuccessfulApplications(Project project) {
+        ApplicationControl appControl = new ApplicationControl();
+        return appControl.getSuccessfulApplications(project);
+    }
+    
+    /**
+     * Check if a user is already an officer for a project
+     * @param nric the user's NRIC
+     * @param project the project
+     * @return true if user is an officer for the project, false otherwise
+     */
+    public boolean isOfficerForProject(String nric, Project project) {
+        for (Map<String, Object> reg : officerRegistrations) {
+            HDBOfficer regOfficer = (HDBOfficer) reg.get("officer");
+            Project regProject = (Project) reg.get("project");
+            RegistrationStatus status = (RegistrationStatus) reg.get("status");
+            
+            if (regOfficer.getNRIC().equals(nric) && 
+                regProject.getProjectID().equals(project.getProjectID()) &&
+                status == RegistrationStatus.APPROVED) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    
+    /**
+     * Helper method to find or create an officer by NRIC
+     * @param nric the officer's NRIC
+     * @return the officer object
+     */
+    private HDBOfficer findOrCreateOfficer(String nric) {
+        // In a real system, this would check a database or repository
+        // For now, create a placeholder officer
+        return new HDBOfficer(
+            "Officer", // Placeholder name
+            nric,
+            "password",
+            30, // Placeholder age
+            "Married", // Placeholder marital status
+            "HDBOfficer"
+        );
+    }
+    
+    /**
+     * Helper method to find or create a project by ID
+     * @param projectID the project ID
+     * @return the project object
+     */
+    private Project findOrCreateProject(String projectID) {
+        // Get the project from project control if possible
+        ProjectControl projectControl = new ProjectControl();
+        List<Project> allProjects = projectControl.getAllProjects();
+        
+        for (Project p : allProjects) {
+            if (p.getProjectID().equals(projectID)) {
+                return p;
+            }
+        }
+        
+        // If not found, create a placeholder
+        return new Project(
+            projectID,
+            "Project", // Placeholder name
+            "Neighborhood", // Placeholder neighborhood
+            new HashMap<>(), // Placeholder units
+            new Date(), // Placeholder open date
+            new Date(), // Placeholder close date
+            null, // Placeholder manager
+            5 // Placeholder officer slots
+        );
     }
     
     /**
      * Book a flat for an applicant
      * @param officer the HDB officer processing the booking
      * @param application the application
-     * @param flat the flat to book
+     * @param flatType the flat type to book
      * @return true if booking is successful, false otherwise
      */
-    public boolean bookFlat(HDBOfficer officer, Application application, Flat flat) {
+    public boolean bookFlat(HDBOfficer officer, Application application, FlatType flatType) {
         // Check if officer is handling the project
         if (!officer.isHandlingProject(application.getProject())) {
             return false;
@@ -268,27 +451,38 @@ public class HDBOfficerControl {
             return false;
         }
         
-        // Check if flat is available
-        if (flat.isBooked()) {
+        Project project = application.getProject();
+        
+        // Check if there are available units of this type
+        if (project.getAvailableUnitsByType(flatType) <= 0) {
             return false;
         }
         
+        // Generate a new flat
+        String flatID = "F" + project.getProjectID() + "-" + flatType.toString().charAt(0) + "-" + 
+                       (project.getTotalUnitsByType(flatType) - project.getAvailableUnitsByType(flatType) + 1);
+        
+        Flat newFlat = new Flat(flatID, project, flatType);
+        
         // Book the flat
-        flat.setBookedByApplication(application);
-        application.setBookedFlat(flat);
+        newFlat.setBookedByApplication(application);
+        application.setBookedFlat(newFlat);
         application.setStatus(ApplicationStatus.BOOKED);
         
         // Update the applicant
         Applicant applicant = application.getApplicant();
-        applicant.setBookedFlat(flat);
+        applicant.setBookedFlat(newFlat);
         
         // Update available units count
-        Project project = application.getProject();
-        FlatType flatType = flat.getType();
+        project.decrementAvailableUnits(flatType);
         
-        // Get current available units and decrement by 1
-        int availableUnits = project.getAvailableUnitsByType(flatType);
-        project.setAvailableUnitsByType(flatType, availableUnits - 1);
+        // Update application in storage
+        ApplicationControl appControl = new ApplicationControl();
+        appControl.updateApplication(application);
+        
+        // Update project in storage
+        ProjectControl projectControl = new ProjectControl();
+        projectControl.updateProject(project);
         
         return true;
     }
@@ -296,7 +490,7 @@ public class HDBOfficerControl {
     /**
      * Generate a receipt for a booking
      * @param application the application with a booked flat
-     * @return a formatted receipt string
+     * @return the receipt string
      */
     public String generateReceipt(Application application) {
         if (application.getStatus() != ApplicationStatus.BOOKED || application.getBookedFlat() == null) {
@@ -332,7 +526,57 @@ public class HDBOfficerControl {
         receipt.append("Please keep this receipt for your records.\n");
         receipt.append("====================================================\n");
         
+        // Save receipt to file
+        saveReceipt(application);
+        
         return receipt.toString();
+    }
+    
+    /**
+     * Save a receipt to the receipts file
+     * @param application the application with booking details
+     */
+    private void saveReceipt(Application application) {
+        try {
+            // Create directories if they don't exist
+            File directory = new File("files/resources/Receipt.csv");
+            if (!directory.exists()) {
+                directory.mkdirs();
+            }
+            
+            // Check if file exists, create with header if not
+            File receiptFile = new File("files/resources/Receipt.csv");
+            boolean fileExists = receiptFile.exists();
+            
+            try (FileWriter fw = new FileWriter(receiptFile, true);
+                 BufferedWriter bw = new BufferedWriter(fw);
+                 PrintWriter writer = new PrintWriter(bw)) {
+                
+                // Add header if file is new
+                if (!fileExists) {
+                    writer.println("ReceiptID,ApplicationID,ApplicantNRIC,ProjectID,FlatID,FlatType,GenerationDate");
+                }
+                
+                // Write receipt data
+                Applicant applicant = application.getApplicant();
+                Project project = application.getProject();
+                Flat flat = application.getBookedFlat();
+                
+                String receiptID = "REC-" + application.getApplicationID();
+                
+                writer.println(
+                    receiptID + "," +
+                    application.getApplicationID() + "," +
+                    applicant.getNRIC() + "," +
+                    project.getProjectID() + "," +
+                    flat.getFlatID() + "," +
+                    flat.getType() + "," +
+                    System.currentTimeMillis()
+                );
+            }
+        } catch (IOException e) {
+            System.out.println("Error loading officer registrations: " + e.getMessage());
+        }
     }
     
     /**
