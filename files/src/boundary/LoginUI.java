@@ -117,4 +117,9 @@ public class LoginUI {
             sc.close();
         }
     }
+
+    public Object getScanner() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'getScanner'");
+    }
 }

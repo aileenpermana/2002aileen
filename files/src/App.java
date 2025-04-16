@@ -1,5 +1,3 @@
-package main;
-
 import boundary.ApplicantUI;
 import boundary.LoginUI;
 import boundary.ManagerUI;
@@ -8,8 +6,9 @@ import entity.Applicant;
 import entity.HDBManager;
 import entity.HDBOfficer;
 import entity.User;
-import utils.ScreenUtil;
+import java.util.Scanner;
 import utils.InitializationUtil;
+import utils.ScreenUtil;
 
 /**
  * Main application class for the BTO Management System.
@@ -59,7 +58,8 @@ public class App {
                 currentUser = loginUI.getCurrentUser();
                 if (currentUser == null) {
                     System.out.println("Login failed. Press Enter to try again or type 'exit' to quit.");
-                    String input = loginUI.getScanner().nextLine();
+                    Scanner sc = new Scanner(System.in);
+                    String input = sc.nextLine();
                     if (input.equalsIgnoreCase("exit")) {
                         break;
                     }

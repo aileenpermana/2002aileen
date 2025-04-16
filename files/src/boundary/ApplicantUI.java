@@ -21,7 +21,7 @@ public class ApplicantUI {
     private HDBOfficerControl officerControl;
     
     // Store user's filter preferences
-    private Map<String, String> filterPreferences;
+    private Map<String, Object> filterPreferences;
     
     // Project sorting options
     private static final String SORT_BY_FLAT_TYPE = "1";
@@ -50,49 +50,53 @@ public class ApplicantUI {
     /**
      * Display the main menu for Applicants
      */
-    public void displayMenu() {
-        boolean exit = false;
+    /**
+ * Updated displayMenu method for ApplicantUI class
+ */
+
+public void displayMenu() {
+    boolean exit = false;
+    
+    while (!exit) {
+        ScreenUtil.clearScreen();
+        System.out.println("\n===== Applicant Menu =====");
+        System.out.println("Welcome, " + currentUser.getName() + "!");
+        System.out.println("1. View Available Projects");
+        System.out.println("2. View My Applications");
+        System.out.println("3. Enquiry Management");  // New option
+        System.out.println("4. View My Profile");
+        System.out.println("5. Change Password");
+        System.out.println("6. Sign Out");
         
-        while (!exit) {
-            ScreenUtil.clearScreen();
-            System.out.println("\n===== Applicant Menu =====");
-            System.out.println("Welcome, " + currentUser.getName() + "!");
-            System.out.println("1. View Available Projects");
-            System.out.println("2. View My Applications");
-            System.out.println("3. View My Profile");
-            System.out.println("4. Enquiry Management");
-            System.out.println("5. Change Password");
-            System.out.println("6. Sign Out");
-            
-            System.out.print("\nEnter your choice: ");
-            String choice = sc.nextLine();
-            
-            switch (choice) {
-                case "1":
-                    viewAvailableProjects();
-                    break;
-                case "2":
-                    viewMyApplications();
-                    break;
-                case "3":
-                    viewProfile();
-                    break;
-                case "4":
-                    enquiryManagement();
-                    break;
-                case "5":
-                    changePassword();
-                    break;
-                case "6":
-                    exit = true;
-                    System.out.println("Signing out...");
-                    break;
-                default:
-                    System.out.println("Invalid choice. Press Enter to continue.");
-                    sc.nextLine();
-            }
+        System.out.print("\nEnter your choice: ");
+        String choice = sc.nextLine();
+        
+        switch (choice) {
+            case "1":
+                viewAvailableProjects();
+                break;
+            case "2":
+                viewMyApplications();
+                break;
+            case "3":
+                displayEnquiryMenu();  // New method
+                break;
+            case "4":
+                viewProfile();
+                break;
+            case "5":
+                changePassword();
+                break;
+            case "6":
+                exit = true;
+                System.out.println("Signing out...");
+                break;
+            default:
+                System.out.println("Invalid choice. Press Enter to continue.");
+                sc.nextLine();
         }
     }
+}
     
     /**
      * View all available projects based on eligibility and visibility
@@ -115,7 +119,7 @@ public class ApplicantUI {
         displayFilterOptions();
         
         // Apply filters and sorting
-        eligibleProjects = applyFiltersAndSort(eligibleProjects);
+        //eligibleProjects = applyFiltersAndSort(eligibleProjects);
         
         // Display projects
         displayProjects(eligibleProjects);
@@ -188,24 +192,25 @@ public class ApplicantUI {
     
     /**
      * Apply filters and sorting to a list of projects
-     */
+     
     private List<Project> applyFiltersAndSort(List<Project> projects) {
         List<Project> filteredProjects = new ArrayList<>(projects);
         
         // Apply neighborhood filter if specified
         if (filterPreferences.containsKey("neighborhood")) {
-            String neighborhoodFilter = filterPreferences.get("neighborhood");
-            filteredProjects.removeIf(p -> !p.getNeighborhood().equalsIgnoreCase(neighborhoodFilter));
+            Object neighborhoodFilter = filterPreferences.get("neighborhood");
         }
         
         // Apply flat type filter if specified
         if (filterPreferences.containsKey("flatType")) {
-            String flatTypeFilter = filterPreferences.get("flatType");
+            Object flatTypeFilter = filterPreferences.get("flatType");
+            // Convert to FlatType enum
+            String flatType = (String) flatTypeFilter;
             FlatType type = null;
             
-            if (flatTypeFilter.equalsIgnoreCase("2-Room")) {
+            if (flatType.equalsIgnoreCase("2-Room")) {
                 type = FlatType.TWO_ROOM;
-            } else if (flatTypeFilter.equalsIgnoreCase("3-Room")) {
+            } else if (flatType.equalsIgnoreCase("3-Room")) {
                 type = FlatType.THREE_ROOM;
             }
             
@@ -216,7 +221,7 @@ public class ApplicantUI {
         }
         
         // Apply sorting
-        String sortBy = filterPreferences.getOrDefault("sortBy", SORT_BY_ALPHABETICAL);
+        Object sortBy = filterPreferences.getOrDefault("sortBy", SORT_BY_ALPHABETICAL);
         
         switch (sortBy) {
             case SORT_BY_FLAT_TYPE:
@@ -249,6 +254,7 @@ public class ApplicantUI {
         
         return filteredProjects;
     }
+        */
     
     /**
      * Calculate total available units across all flat types
@@ -286,6 +292,330 @@ public class ApplicantUI {
         }
     }
     
+    /**
+ * Methods to add to the ApplicantUI class for enquiry management
+ */
+
+/**
+ * Display the enquiry menu
+ */
+private void displayEnquiryMenu() {
+    ScreenUtil.clearScreen();
+    System.out.println("\n===== Enquiry Menu =====");
+    System.out.println("1. Make New Enquiry");
+    System.out.println("2. View My Enquiries");
+    System.out.println("3. Return to Main Menu");
+    
+    System.out.print("\nEnter your choice: ");
+    String choice = sc.nextLine();
+    
+    switch (choice) {
+        case "1":
+            makeEnquiry();
+            break;
+        case "2":
+            viewEnquiries();
+            break;
+        case "3":
+            return;
+        default:
+            System.out.println("Invalid choice. Press Enter to continue.");
+            sc.nextLine();
+    }
+}
+
+/**
+ * Make a new enquiry
+ */
+private void makeEnquiry() {
+    ScreenUtil.clearScreen();
+    System.out.println("\n===== Make New Enquiry =====");
+    
+    // Get visible projects for the applicant
+    List<Project> visibleProjects = projectControl.getVisibleProjectsForUser(currentUser, filterPreferences);
+    
+    if (visibleProjects.isEmpty()) {
+        System.out.println("No projects available for enquiry at this time.");
+        System.out.println("Press Enter to continue...");
+        sc.nextLine();
+        return;
+    }
+    
+    // Display the list of projects
+    System.out.println("Select a project to enquire about:");
+    for (int i = 0; i < visibleProjects.size(); i++) {
+        System.out.println((i + 1) + ". " + visibleProjects.get(i).getProjectName());
+    }
+    
+    System.out.print("\nEnter project number (0 to cancel): ");
+    int projectChoice;
+    try {
+        projectChoice = Integer.parseInt(sc.nextLine());
+        if (projectChoice == 0) {
+            return;
+        }
+        
+        if (projectChoice < 1 || projectChoice > visibleProjects.size()) {
+            System.out.println("Invalid project number. Press Enter to continue.");
+            sc.nextLine();
+            return;
+        }
+    } catch (NumberFormatException e) {
+        System.out.println("Invalid input. Press Enter to continue.");
+        sc.nextLine();
+        return;
+    }
+    
+    Project selectedProject = visibleProjects.get(projectChoice - 1);
+    
+    // Get enquiry content
+    System.out.println("\nEnter your enquiry about " + selectedProject.getProjectName() + ":");
+    String content = sc.nextLine();
+    
+    if (content.trim().isEmpty()) {
+        System.out.println("Enquiry cannot be empty. Press Enter to continue.");
+        sc.nextLine();
+        return;
+    }
+    
+    // Create and submit the enquiry
+    EnquiryControl enquiryControl = new EnquiryControl();
+    Enquiry enquiry = enquiryControl.submitEnquiry(currentUser, selectedProject, content);
+    
+    if (enquiry != null) {
+        System.out.println("\nEnquiry submitted successfully!");
+        System.out.println("Enquiry ID: " + enquiry.getEnquiryID());
+    } else {
+        System.out.println("\nFailed to submit enquiry. Please try again later.");
+    }
+    
+    System.out.println("Press Enter to continue...");
+    sc.nextLine();
+}
+
+/**
+ * View all enquiries made by the applicant
+ */
+private void viewEnquiries() {
+    ScreenUtil.clearScreen();
+    System.out.println("\n===== My Enquiries =====");
+    
+    // Get all enquiries for the current applicant
+    EnquiryControl enquiryControl = new EnquiryControl();
+    List<Enquiry> myEnquiries = enquiryControl.getEnquiriesByApplicant(currentUser);
+    
+    if (myEnquiries.isEmpty()) {
+        System.out.println("You have not made any enquiries yet.");
+        System.out.println("Press Enter to continue...");
+        sc.nextLine();
+        return;
+    }
+    
+    // Display the list of enquiries
+    SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm");
+    
+    System.out.printf("%-5s %-20s %-20s %-30s %-15s\n", 
+                     "No.", "Project", "Date", "Content", "Status");
+    System.out.println("--------------------------------------------------------------------------------");
+    
+    for (int i = 0; i < myEnquiries.size(); i++) {
+        Enquiry enquiry = myEnquiries.get(i);
+        String status = (enquiry.getReplies() != null && !enquiry.getReplies().isEmpty()) ? 
+                         "Replied" : "Pending";
+        
+        System.out.printf("%-5d %-20s %-20s %-30s %-15s\n", 
+                        (i + 1),
+                        truncateString(enquiry.getProject().getProjectName(), 20),
+                        dateFormat.format(enquiry.getSubmissionDate()),
+                        truncateString(enquiry.getContent(), 30),
+                        status);
+    }
+    
+    // Options submenu
+    System.out.println("\nOptions:");
+    System.out.println("1. View Enquiry Details");
+    System.out.println("2. Edit Enquiry");
+    System.out.println("3. Delete Enquiry");
+    System.out.println("4. Return to Enquiry Menu");
+    
+    System.out.print("\nEnter your choice: ");
+    String choice = sc.nextLine();
+    
+    switch (choice) {
+        case "1":
+            viewEnquiryDetails(myEnquiries);
+            break;
+        case "2":
+            editEnquiry(myEnquiries);
+            break;
+        case "3":
+            deleteEnquiry(myEnquiries);
+            break;
+        case "4":
+            return;
+        default:
+            System.out.println("Invalid choice. Press Enter to continue.");
+            sc.nextLine();
+    }
+}
+
+/**
+ * View details of a specific enquiry
+ * @param enquiries list of enquiries to choose from
+ */
+private void viewEnquiryDetails(List<Enquiry> enquiries) {
+    System.out.print("\nEnter enquiry number to view details: ");
+    try {
+        int enquiryIndex = Integer.parseInt(sc.nextLine()) - 1;
+        if (enquiryIndex < 0 || enquiryIndex >= enquiries.size()) {
+            System.out.println("Invalid enquiry number. Press Enter to continue.");
+            sc.nextLine();
+            return;
+        }
+        
+        Enquiry selectedEnquiry = enquiries.get(enquiryIndex);
+        displayEnquiryDetails(selectedEnquiry);
+    } catch (NumberFormatException e) {
+        System.out.println("Invalid input. Press Enter to continue.");
+        sc.nextLine();
+    }
+}
+
+/**
+ * Display details of an enquiry
+ * @param enquiry the enquiry to display
+ */
+private void displayEnquiryDetails(Enquiry enquiry) {
+    ScreenUtil.clearScreen();
+    SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy HH:mm");
+    
+    System.out.println("\n===== Enquiry Details =====");
+    System.out.println("Enquiry ID: " + enquiry.getEnquiryID());
+    System.out.println("Project: " + enquiry.getProject().getProjectName());
+    System.out.println("Date: " + dateFormat.format(enquiry.getSubmissionDate()));
+    System.out.println("\nContent:");
+    System.out.println(enquiry.getContent());
+    
+    if (enquiry.getReplies() != null && !enquiry.getReplies().isEmpty()) {
+        System.out.println("\nReplies:");
+        for (int i = 0; i < enquiry.getReplies().size(); i++) {
+            System.out.println((i + 1) + ". " + enquiry.getReplies().get(i));
+        }
+    } else {
+        System.out.println("\nNo replies yet.");
+    }
+    
+    System.out.println("\nPress Enter to continue...");
+    sc.nextLine();
+}
+
+/**
+ * Edit an enquiry
+ * @param enquiries list of enquiries to choose from
+ */
+private void editEnquiry(List<Enquiry> enquiries) {
+    System.out.print("\nEnter enquiry number to edit: ");
+    try {
+        int enquiryIndex = Integer.parseInt(sc.nextLine()) - 1;
+        if (enquiryIndex < 0 || enquiryIndex >= enquiries.size()) {
+            System.out.println("Invalid enquiry number. Press Enter to continue.");
+            sc.nextLine();
+            return;
+        }
+        
+        Enquiry selectedEnquiry = enquiries.get(enquiryIndex);
+        
+        // Check if enquiry has been replied to
+        EnquiryControl enquiryControl = new EnquiryControl();
+        if (enquiryControl.hasBeenReplied(selectedEnquiry)) {
+            System.out.println("Cannot edit an enquiry that has been replied to. Press Enter to continue.");
+            sc.nextLine();
+            return;
+        }
+        
+        // Display current content
+        ScreenUtil.clearScreen();
+        System.out.println("\n===== Edit Enquiry =====");
+        System.out.println("Project: " + selectedEnquiry.getProject().getProjectName());
+        System.out.println("\nCurrent content:");
+        System.out.println(selectedEnquiry.getContent());
+        
+        // Get new content
+        System.out.println("\nEnter new content (or press Enter to cancel):");
+        String newContent = sc.nextLine();
+        
+        if (newContent.trim().isEmpty()) {
+            System.out.println("Edit cancelled. Press Enter to continue.");
+            sc.nextLine();
+            return;
+        }
+        
+        // Update the enquiry
+        boolean success = enquiryControl.editEnquiry(selectedEnquiry, newContent);
+        
+        if (success) {
+            System.out.println("\nEnquiry updated successfully!");
+        } else {
+            System.out.println("\nFailed to update enquiry. Please try again later.");
+        }
+        
+        System.out.println("Press Enter to continue...");
+        sc.nextLine();
+    } catch (NumberFormatException e) {
+        System.out.println("Invalid input. Press Enter to continue.");
+        sc.nextLine();
+    }
+}
+
+/**
+ * Delete an enquiry
+ * @param enquiries list of enquiries to choose from
+ */
+private void deleteEnquiry(List<Enquiry> enquiries) {
+    System.out.print("\nEnter enquiry number to delete: ");
+    try {
+        int enquiryIndex = Integer.parseInt(sc.nextLine()) - 1;
+        if (enquiryIndex < 0 || enquiryIndex >= enquiries.size()) {
+            System.out.println("Invalid enquiry number. Press Enter to continue.");
+            sc.nextLine();
+            return;
+        }
+        
+        Enquiry selectedEnquiry = enquiries.get(enquiryIndex);
+        
+        // Check if enquiry has been replied to
+        EnquiryControl enquiryControl = new EnquiryControl();
+        if (enquiryControl.hasBeenReplied(selectedEnquiry)) {
+            System.out.println("Cannot delete an enquiry that has been replied to. Press Enter to continue.");
+            sc.nextLine();
+            return;
+        }
+        
+        // Confirm deletion
+        System.out.print("\nAre you sure you want to delete this enquiry? (Y/N): ");
+        String confirmation = sc.nextLine();
+        
+        if (confirmation.equalsIgnoreCase("Y")) {
+            // Delete the enquiry
+            boolean success = enquiryControl.deleteEnquiry(selectedEnquiry);
+            
+            if (success) {
+                System.out.println("\nEnquiry deleted successfully!");
+            } else {
+                System.out.println("\nFailed to delete enquiry. Please try again later.");
+            }
+        } else {
+            System.out.println("Deletion cancelled.");
+        }
+        
+        System.out.println("Press Enter to continue...");
+        sc.nextLine();
+    } catch (NumberFormatException e) {
+        System.out.println("Invalid input. Press Enter to continue.");
+        sc.nextLine();
+    }
+}
+
     /**
      * Truncate a string to a maximum length
      * @param str the string to truncate
