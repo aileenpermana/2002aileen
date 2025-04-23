@@ -37,7 +37,7 @@ public class OfficerUI {
     /**
      * Display the main menu for HDB Officers
      */
-    public void displayMenu() {
+    public boolean displayMenu() {
         boolean exit = false;
         List<Project> myProjects = currentUser.getHandlingProjects();
         if (myProjects == null || myProjects.isEmpty()) {
@@ -69,12 +69,12 @@ public class OfficerUI {
                 case "5" -> viewProfile();
                 case "6" -> {
                     System.out.println("Switching to Applicant role...");
-                    return;
+                    return false;
                 }
                 case "7" -> changePassword();
                 case "8" -> {
-                    exit = true;
                     System.out.println("Signing out...");
+                    return true;
                 }
                 default -> {
                     System.out.println("Invalid choice. Press Enter to continue.");
@@ -82,6 +82,7 @@ public class OfficerUI {
                 }
             }
         }
+        return false;
     }
     
     /**
@@ -109,17 +110,7 @@ public class OfficerUI {
         sc.nextLine();
     }
     
-    /**
-     * View my applications - implemented similarly to ApplicantUI
-     * This method would be similar to the one in ApplicantUI, so I'm keeping it brief
-     */
-    private void viewMyApplications() {
-        // Implementation similar to ApplicantUI.viewMyApplications()
-        System.out.println("\n===== My Applications =====");
-        System.out.println("This feature is available but not shown for brevity.");
-        System.out.println("Press Enter to continue...");
-        sc.nextLine();
-    }
+    
     
     /**
      * View officer registrations

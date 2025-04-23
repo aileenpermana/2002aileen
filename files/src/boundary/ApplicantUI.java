@@ -55,7 +55,7 @@ public class ApplicantUI {
  * Updated displayMenu method for ApplicantUI class
  */
 
- public void displayMenu() {
+ public boolean displayMenu() {
     boolean exit = false;
     
     while (!exit) {
@@ -100,26 +100,26 @@ public class ApplicantUI {
             case "5":
                 changePassword();
                 break;
-            case "6": {
-                if (isOfficer) {
-                    // Switch role to Officer UI
-                    return; // Exit the menu, triggering role switch in main App
-                } else {
-                    exit = true;
+                case "6": {
+                    if (isOfficer) {
+                        // Switch role to Officer UI
+                        return false; // Return false as this is a role switch, not a sign out
+                    } else {
+                        return true; // Return true to indicate sign out
+                    }
                 }
-                break;
-            }
-            case "7": {
-                if (isOfficer) {
-                    exit = true;
+                case "7": {
+                    if (isOfficer) {
+                        return true; // Return true to indicate sign out
+                    }
+                    break;
                 }
-                break;
-            }
             default:
                 System.out.println("Invalid choice. Press Enter to continue.");
                 sc.nextLine();
         }
     }
+    return false;
 }
     
     private void viewAvailableProjects() {

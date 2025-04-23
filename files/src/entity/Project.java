@@ -385,13 +385,11 @@ public class Project {
                 )
             );
             if (!officerRegistrations.isEmpty()) {
-                System.out.println("\nOfficer Registration Status:");
                 for (Map<String, Object> reg : officerRegistrations) {
                     Project project = (Project) reg.get("project");
                     RegistrationStatus status = (RegistrationStatus) reg.get("status");
                     if (status == RegistrationStatus.APPROVED){
-                        if (project.getProjectID() == projectID) {
-                            System.out.println("You are already registered as officer for this project.");
+                        if (project.getProjectID().equals(projectID)) {
                             return false; // Already registered for this project
                         }
                     }

@@ -118,75 +118,70 @@ private Applicant findOrCreateApplicant(String nric) {
         return saveWithdrawalRequests();
     }
     
-    /**
-     * Process a withdrawal request
-     * @param application the application
-     * @param approve true to approve, false to reject
-     * @return true if processing is successful, false otherwise
-     */
-    public boolean processWithdrawalRequest(Application application, boolean approve) {
-        // Find the request
-        Map<String, Object> request = null;
-        for (Map<String, Object> req : withdrawalRequests) {
-            Application reqApp = (Application) req.get("application");
-            if (reqApp.getApplicationID().equals(application.getApplicationID())) {
-                request = req;
-                break;
-            }
-        }
-        
-        if (request == null) {
-            return false; // Request not found
-        }
-        
-        if (approve) {
-            // Update application status
-            ApplicationStatus currentStatus = application.getStatus();
-            application.setStatus(ApplicationStatus.UNSUCCESSFUL);
-            
-            // If the application was successful or booked, increment available units
-            if (currentStatus == ApplicationStatus.SUCCESSFUL || currentStatus == ApplicationStatus.BOOKED) {
-                Project project = application.getProject();
-                
-                // If flat was booked, free it
-                if (currentStatus == ApplicationStatus.BOOKED) {
-                    Flat bookedFlat = application.getBookedFlat();
-                    if (bookedFlat != null) {
-                        FlatType flatType = bookedFlat.getType();
-                        bookedFlat.setBookedByApplication(null);
-                        application.setBookedFlat(null);
-                        application.getApplicant().setBookedFlat(null);
-                        
-                        // Increment available units
-                        project.incrementAvailableUnits(flatType);
-                    }
-                } else {
-                    // For successful applications without a booked flat, determine flat type
-                    FlatType flatType = determineEligibleFlatType(application);
-                    if (flatType != null) {
-                        project.incrementAvailableUnits(flatType);
-                    }
-                }
-                
-                // Update project
-                ProjectControl projectControl = new ProjectControl();
-                projectControl.updateProject(project);
-            }
-            
-            // Update request status
-            request.put("status", "APPROVED");
-            
-            // Save changes
-            saveApplications();
-            saveWithdrawalRequests();
-            
-            return true;
-        } else {
-            // Just update request status
-            request.put("status", "REJECTED");
-            return saveWithdrawalRequests();
+    // In ApplicationControl.java - processWithdrawalRequest method
+public boolean processWithdrawalRequest(Application application, boolean approve) {
+    // Find the request
+    Map<String, Object> request = null;
+    for (Map<String, Object> req : withdrawalRequests) {
+        Application reqApp = (Application) req.get("application");
+        if (reqApp.getApplicationID().equals(application.getApplicationID())) {
+            request = req;
+            break;
         }
     }
+    
+    if (request == null) {
+        return false; // Request not found
+    }
+    
+    if (approve) {
+        // Update application status
+        ApplicationStatus currentStatus = application.getStatus();
+        application.setStatus(ApplicationStatus.UNSUCCESSFUL);  // Set to UNSUCCESSFUL when approved
+        
+        // If the application was successful or booked, increment available units
+        if (currentStatus == ApplicationStatus.SUCCESSFUL || currentStatus == ApplicationStatus.BOOKED) {
+            Project project = application.getProject();
+            
+            // If flat was booked, free it
+            if (currentStatus == ApplicationStatus.BOOKED) {
+                Flat bookedFlat = application.getBookedFlat();
+                if (bookedFlat != null) {
+                    FlatType flatType = bookedFlat.getType();
+                    bookedFlat.setBookedByApplication(null);
+                    application.setBookedFlat(null);
+                    application.getApplicant().setBookedFlat(null);
+                    
+                    // Increment available units
+                    project.incrementAvailableUnits(flatType);
+                }
+            } else {
+                // For successful applications without a booked flat, determine flat type
+                FlatType flatType = determineEligibleFlatType(application);
+                if (flatType != null) {
+                    project.incrementAvailableUnits(flatType);
+                }
+            }
+            
+            // Update project
+            ProjectControl projectControl = new ProjectControl();
+            projectControl.updateProject(project);
+        }
+        
+        // Update request status
+        request.put("status", "APPROVED");
+        
+        // Save changes to CSV
+        saveApplications();  // Update the applications CSV
+        saveWithdrawalRequests();  // Update the withdrawal requests CSV
+        
+        return true;
+    } else {
+        // Just update request status
+        request.put("status", "REJECTED");
+        return saveWithdrawalRequests();
+    }
+}
     
     /**
      * Get all applications in the system

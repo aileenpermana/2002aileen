@@ -43,7 +43,7 @@ public class ManagerUI {
     /**
      * Display the main menu for HDB Managers
      */
-    public void displayMenu() {
+    public boolean displayMenu() {
         boolean exit = false;
         List<Project> myProjects = currentUser.getManagedProjects();
         if (myProjects == null || myProjects.isEmpty()) {
@@ -100,12 +100,13 @@ public class ManagerUI {
                 case "10":
                     exit = true;
                     System.out.println("Signing out...");
-                    break;
+                    return true;
                 default:
                     System.out.println("Invalid choice. Press Enter to continue.");
                     sc.nextLine();
             }
         }
+        return false;
     }
     
     /**
