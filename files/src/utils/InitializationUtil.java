@@ -1,5 +1,6 @@
 package utils;
 
+import control.ProjectControl;
 import java.io.*;
 
 /**
@@ -17,8 +18,14 @@ public class InitializationUtil {
         initializeOfficerList();
         initializeProjectList();
         initializeEmptyFiles();
+        linkManagersToProjects();
     }
     
+    private static void linkManagersToProjects() {
+        // This method ensures managers are linked to their projects
+        ProjectControl projectControl = new ProjectControl();
+        projectControl.syncManagerProjects();
+    }
     /**
      * Ensure the resources directory exists
      */

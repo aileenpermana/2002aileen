@@ -5,6 +5,7 @@ import control.EnquiryControl;
 import control.HDBManagerControl;
 import control.ProjectControl;
 import control.ReportControl;
+import control.UserControl;
 import entity.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -1862,7 +1863,17 @@ public class ManagerUI {
         
         // Change password
         currentUser.setPassword(newPassword);
-        System.out.println("Password changed successfully!");
+
+        // Update the password in the CSV file
+        UserControl userControl = new UserControl();
+        boolean saved = userControl.updateUserPassword(currentUser);
+
+        if (saved) {
+            System.out.println("Password changed successfully!");
+        } else {
+            System.out.println("Password changed in memory but could not be saved to file.");
+            System.out.println("Changes may be lost when you restart the application.");
+        }
         System.out.println("Press Enter to continue...");
         sc.nextLine();
     }

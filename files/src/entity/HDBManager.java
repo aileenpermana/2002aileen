@@ -245,7 +245,17 @@ public class HDBManager extends User {
         
         return false;
     }
-    
+    // In HDBManager.java, add this method:
+
+    /**
+     * Add a project to the manager's list of managing projects
+     * @param project the project to add
+     */
+    public void addManagedProject(Project project) {
+        if (!this.managingProjects.contains(project)) {
+            this.managingProjects.add(project);
+        }
+    }
     /**
      * Process a withdrawal request
      * @param application the application to withdraw

@@ -178,9 +178,14 @@ public class ProjectFileManager {
             }
             
             // Create a temporary manager object - will be replaced later
-            String managerNRIC = fields[10];
-            HDBManager manager = new HDBManager("Manager", managerNRIC, "password", 30, "MARRIED", "MANAGER");
-            
+            String managerNRIC = fields[10].trim();
+        
+        // CHANGE THIS PART: Find actual manager from ManagerList.csv instead of creating a placeholder
+            HDBManager manager = findManagerByNRIC(managerNRIC);
+            if (manager == null) {
+                // If not found, create temporary placeholder (keep as fallback)
+                manager = new HDBManager("Manager", managerNRIC, "password", 30, "MARRIED", "HDBManager");
+            }
             // Parse officer slots with error handling
             int officerSlots;
             try {
@@ -190,7 +195,6 @@ public class ProjectFileManager {
                 officerSlots = 5; // Default value
             }
             
-            // Create the project
             String projectID = generateProjectID(projectName);
             Project project = new Project(
                 projectID,
@@ -214,7 +218,38 @@ public class ProjectFileManager {
             return null;
         }
     }
-    
+    private HDBManager findManagerByNRIC(String nric) {
+        try (Scanner scanner = new Scanner(new File("files/resources/ManagerList.csv"))) {
+            // Skip header
+            if (scanner.hasNextLine()) {
+                scanner.nextLine();
+            }
+            
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine().trim();
+                if (line.isEmpty()) continue;
+                
+                String[] fields = line.split(",");
+                if (fields.length < 5) continue;
+                
+                String managerNRIC = fields[1].trim();
+                if (managerNRIC.equalsIgnoreCase(nric)) {
+                    // Create and return the real manager
+                    return new HDBManager(
+                        fields[0].trim(), // name
+                        managerNRIC,
+                        fields[4].trim(), // password
+                        Integer.parseInt(fields[2].trim()), // age
+                        fields[3].trim(), // marital status
+                        "HDBManager"
+                    );
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error finding manager: " + e.getMessage());
+        }
+        return null;
+    }
     /**
      * Generate a simple project ID based on the project name
      * @param projectName the project name
