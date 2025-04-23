@@ -230,11 +230,18 @@ public class Project {
     }
     
     /**
-     * Check if the project is open for application
-     * @return true if within application period, false otherwise
-     */
+ * Check if the project is open for application
+ * @return true if within application period, false otherwise
+ */
     public boolean isOpenForApplication() {
         Date now = new Date();
+        
+        // Project must be visible
+        if (!isVisible()) {
+            return false;
+        }
+        
+        // Current date must be between open and close dates (inclusive)
         return now.compareTo(applicationOpenDate) >= 0 && now.compareTo(applicationCloseDate) <= 0;
     }
     
