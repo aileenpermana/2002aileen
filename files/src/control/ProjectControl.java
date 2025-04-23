@@ -1,6 +1,7 @@
 package control;
 
 import entity.*;
+import java.io.File;
 import java.util.*;
 import utils.ProjectFileManager;
 
@@ -410,5 +411,69 @@ public List<Project> filterProjects(List<Project> projects, Map<String, Object> 
     }
     
     return filteredProjects;
+}
+
+// In ProjectControl.java, add this method:
+
+/**
+ * Sync managers with their projects
+ * This ensures all managers are properly linked to their projects after loading from files
+ */
+public void syncManagerProjects() {
+    List<Project> allProjects = getAllProjects();
+    
+    // Group projects by manager NRIC
+    Map<String, List<Project>> projectsByManager = new HashMap<>();
+    
+    for (Project project : allProjects) {
+        HDBManager manager = project.getManagerInCharge();
+        String managerNRIC = manager.getNRIC();
+        
+        if (!projectsByManager.containsKey(managerNRIC)) {
+            projectsByManager.put(managerNRIC, new ArrayList<>());
+        }
+        
+        projectsByManager.get(managerNRIC).add(project);
+    }
+    
+    // Now ensure each manager has all their projects
+    for (Map.Entry<String, List<Project>> entry : projectsByManager.entrySet()) {
+        String managerNRIC = entry.getKey();
+        List<Project> managerProjects = entry.getValue();
+        
+        try {
+            // Load manager details
+            File file = new File("files/resources/ManagerList.csv");
+            if (file.exists()) {
+                try (Scanner scanner = new Scanner(file)) {
+                    // Skip header
+                    if (scanner.hasNextLine()) {
+                        scanner.nextLine();
+                    }
+                    
+                    while (scanner.hasNextLine()) {
+                        String line = scanner.nextLine().trim();
+                        if (line.isEmpty()) continue;
+                        
+                        String[] fields = line.split(",");
+                        if (fields.length < 2) continue;
+                        
+                        if (fields[1].trim().equalsIgnoreCase(managerNRIC)) {
+                            // Found the manager in ManagerList.csv
+                            // Now update the manager in each project to ensure bidirectional link
+                            for (Project project : managerProjects) {
+                                HDBManager manager = project.getManagerInCharge();
+                                // Update manager's list
+                                manager.addManagedProject(project);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error syncing manager projects: " + e.getMessage());
+        }
+    }
 }
 }

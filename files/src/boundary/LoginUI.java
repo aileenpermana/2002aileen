@@ -52,7 +52,7 @@ public class LoginUI {
                 return false; // Continue to main menu
             } else {
                 // User not found, ask if they want to register
-                System.out.println("\nUser not found.");
+                System.out.println("\nUser not found or password is incorrect.");
                 System.out.print("Do you want to register as a new user? (Y/N): ");
                 String response = sc.nextLine();
                 
