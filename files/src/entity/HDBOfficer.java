@@ -17,7 +17,6 @@ public class HDBOfficer extends User {
      */
     public HDBOfficer(String name, String NRIC, String password, int age, MaritalStatus maritalStatus, String role) {
         super(name, NRIC, password, age, maritalStatus, role);
-        this.officerID = "HO" + NRIC.substring(1, 8);
         this.handlingProjects = new ArrayList<>();
     }
     
@@ -26,7 +25,6 @@ public class HDBOfficer extends User {
      */
     public HDBOfficer(String name, String NRIC, String password, int age, String maritalStatus, String role) {
         super(name, NRIC, password, age, maritalStatus, role);
-        this.officerID = "HO" + NRIC.substring(1, 8);
         this.handlingProjects = new ArrayList<>();
     }
     
@@ -68,10 +66,8 @@ public class HDBOfficer extends User {
             return false;
         }
         
-        // Check if already handling another project in the same period
-        if (isHandlingProject(project.getApplicationOpenDate(), project.getApplicationCloseDate())) {
-            return false;
-        }
+        
+
         
         // Check if already applied for this project as an applicant
         // This would require checking if this officer has any applications for this project
@@ -100,14 +96,23 @@ public class HDBOfficer extends User {
         return new ArrayList<>(handlingProjects);
     }
     
+    public void setHandlingProjects(List<Project> handlingProjects) {
+        this.handlingProjects = handlingProjects;
+    }
+    
     /**
      * Check if officer is handling a specific project
      * @param project the project to check
      * @return true if handling, false otherwise
      */
     public boolean isHandlingProject(Project project) {
-        return handlingProjects.contains(project);
-    }
+        for (Project p : handlingProjects) {
+            if (p.getProjectID().equals(project.getProjectID())) {
+                return true;
+            }
+        }
+        return false;
+        }    
     
     /**
      * Book a flat for an applicant

@@ -1,6 +1,5 @@
 package utils;
 
-import control.ProjectControl;
 import java.io.*;
 
 /**
@@ -18,17 +17,9 @@ public class InitializationUtil {
         initializeOfficerList();
         initializeProjectList();
         initializeEmptyFiles();
-        linkManagersToProjects();
     }
     
-    private static void linkManagersToProjects() {
-        // This method ensures managers are linked to their projects
-        ProjectControl projectControl = new ProjectControl();
-        projectControl.syncManagerProjects();
-    }
-    /**
-     * Ensure the resources directory exists
-     */
+    
     private static void initializeDirectory() {
         File directory = new File("files/resources");
         if (!directory.exists()) {
@@ -96,12 +87,12 @@ public class InitializationUtil {
         File file = new File("files/resources/ProjectList.csv");
         if (!file.exists()) {
             try (PrintWriter writer = new PrintWriter(new FileWriter(file))) {
-                writer.println("ProjectID,ProjectName,Neighborhood,Type1,NumUnits1,Type2,NumUnits2,OpenDate,CloseDate,Manager,OfficerSlots,Visibility");
-                writer.println("PRO001,Sunrise Heights,Yishun,2-Room,100,3-Room,150,01/05/2024,01/08/2024,S5678901G,5,true");
-                writer.println("PRO002,Garden View,Boon Lay,2-Room,80,3-Room,120,15/05/2024,15/08/2024,S5678901G,3,true");
-                writer.println("PRO003,Skyline Residences,Tampines,2-Room,150,3-Room,200,01/06/2024,01/09/2024,T8765432F,6,true");
-                writer.println("PRO004,Sunset Sunny,Bugis,2-Room,200,3-Room,100,08/11/2025,11/08/2026,T8765432F,10,false");
-                writer.println("PRO005,Acacia Breeze,Yishun,2-Room,20,3-Room,30,02/03/2026,03/08/2026,S5678901G,3,false");
+                writer.println("ProjectID,Project Name,Neighborhood,Type 1,Number of units for Type 1,Selling price for Type 1,Type 2,Number of units for Type 2,Selling price for Type 2,Application opening date,Application closing date,Manager,Officer Slots,Officer");
+                writer.println("SUN001,Sunrise Heights,Yishun,2-Room,100,0,3-Room,150,0,01/05/2024,01/08/2024,S5678901G,5,");
+                writer.println("GAR002,Garden View,Boon Lay,2-Room,80,0,3-Room,120,0,15/05/2024,15/08/2024,S5678901G,3,");
+                writer.println("SKY003,Skyline Residences,Tampines,2-Room,150,0,3-Room,200,0,01/06/2024,01/09/2024,T8765432F,6,");
+                writer.println("SSB004,Sunset Sunny,Bugis,2-Room,200,0,3-Room,100,0,08/11/2025,11/08/2026,T8765432F,10,");
+                writer.println("ACA005,Acacia Breeze,Yishun,2-Room,20,0,3-Room,30,0,02/03/2026,03/08/2026,S5678901G,3,");
             } catch (IOException e) {
                 System.err.println("Error creating project list: " + e.getMessage());
             }

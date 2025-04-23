@@ -1,7 +1,6 @@
 package control;
 
 import entity.*;
-import java.io.File;
 import java.util.*;
 import utils.ProjectFileManager;
 
@@ -37,7 +36,7 @@ public class ProjectControl {
         List<Project> eligibleProjects = new ArrayList<>();
         
         for (Project project : allProjects) {
-            if (project.isVisible() && project.checkEligibility(user)) {
+            if (project.isVisible() && project.checkEligibility(user,project.getProjectID())) {
                 eligibleProjects.add(project);
             }
         }
@@ -72,7 +71,7 @@ public class ProjectControl {
             }
             
             // For all users, check visibility and eligibility
-            if (project.isVisible() && project.checkEligibility(user)) {
+            if (project.isVisible() && project.checkEligibility(user, project.getProjectID())) {
                 visibleProjects.add(project);
             }
         }
@@ -128,6 +127,30 @@ public class ProjectControl {
         
         return managerProjects;
     }
+
+        /**
+     * Get projects handled by a specific officer
+     * @param officer the HDB officer
+     * @return list of projects the officer is handling
+     */
+    public List<Project> getProjectsByOfficer(HDBOfficer officer) {
+        List<Project> allProjects = getAllProjects();
+        List<Project> officerProjects = new ArrayList<>();
+        
+        for (Project project : allProjects) {
+            // Use the existing officers list to check if the officer is handling the project
+            for (HDBOfficer projectOfficer : project.getOfficers()) {
+                if (projectOfficer.getNRIC().equalsIgnoreCase(officer.getNRIC())) {
+                    officerProjects.add(project);
+                    break;
+                }
+            }
+        }
+        
+        return officerProjects;
+    }
+
+    
     
     /**
      * Add a new project to the system
@@ -413,67 +436,5 @@ public List<Project> filterProjects(List<Project> projects, Map<String, Object> 
     return filteredProjects;
 }
 
-// In ProjectControl.java, add this method:
 
-/**
- * Sync managers with their projects
- * This ensures all managers are properly linked to their projects after loading from files
- */
-public void syncManagerProjects() {
-    List<Project> allProjects = getAllProjects();
-    
-    // Group projects by manager NRIC
-    Map<String, List<Project>> projectsByManager = new HashMap<>();
-    
-    for (Project project : allProjects) {
-        HDBManager manager = project.getManagerInCharge();
-        String managerNRIC = manager.getNRIC();
-        
-        if (!projectsByManager.containsKey(managerNRIC)) {
-            projectsByManager.put(managerNRIC, new ArrayList<>());
-        }
-        
-        projectsByManager.get(managerNRIC).add(project);
-    }
-    
-    // Now ensure each manager has all their projects
-    for (Map.Entry<String, List<Project>> entry : projectsByManager.entrySet()) {
-        String managerNRIC = entry.getKey();
-        List<Project> managerProjects = entry.getValue();
-        
-        try {
-            // Load manager details
-            File file = new File("files/resources/ManagerList.csv");
-            if (file.exists()) {
-                try (Scanner scanner = new Scanner(file)) {
-                    // Skip header
-                    if (scanner.hasNextLine()) {
-                        scanner.nextLine();
-                    }
-                    
-                    while (scanner.hasNextLine()) {
-                        String line = scanner.nextLine().trim();
-                        if (line.isEmpty()) continue;
-                        
-                        String[] fields = line.split(",");
-                        if (fields.length < 2) continue;
-                        
-                        if (fields[1].trim().equalsIgnoreCase(managerNRIC)) {
-                            // Found the manager in ManagerList.csv
-                            // Now update the manager in each project to ensure bidirectional link
-                            for (Project project : managerProjects) {
-                                HDBManager manager = project.getManagerInCharge();
-                                // Update manager's list
-                                manager.addManagedProject(project);
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("Error syncing manager projects: " + e.getMessage());
-        }
-    }
-}
 }

@@ -30,7 +30,7 @@ public class ProjectFileManager {
                 projectFile.createNewFile();
                 // Write header
                 FileWriter fw = new FileWriter(projectFile);
-                fw.write("Project Name,Neighborhood,Type 1,Number of units for Type 1,Selling price for Type 1," +
+                fw.write("ProjectID,Project Name,Neighborhood,Type 1,Number of units for Type 1,Selling price for Type 1," +
                          "Type 2,Number of units for Type 2,Selling price for Type 2," +
                          "Application opening date,Application closing date,Manager,Officer Slot,Officer\n");
                 fw.close();
@@ -59,12 +59,12 @@ public class ProjectFileManager {
             
             // Create the file with header
             try (FileWriter fw = new FileWriter(projectFile)) {
-                fw.write("Project Name,Neighborhood,Type 1,Number of units for Type 1,Selling price for Type 1," +
+                fw.write("ProjectID,Project Name,Neighborhood,Type 1,Number of units for Type 1,Selling price for Type 1," +
                          "Type 2,Number of units for Type 2,Selling price for Type 2," +
                          "Application opening date,Application closing date,Manager,Officer Slot,Officer\n");
                 
                 // Add a sample project if needed
-                fw.write("Sunrise Heights,Yishun,2-Room,100,350000,3-Room,150,450000,01/05/2024,01/08/2024,S1234567A,5,\n");
+                fw.write("SUN001,Sunrise Heights,Yishun,2-Room,100,350000,3-Room,150,450000,01/05/2024,01/08/2024,S1234567A,5,\n");
             } catch (IOException e) {
                 System.out.println("Error creating project file: " + e.getMessage());
             }
@@ -73,6 +73,53 @@ public class ProjectFileManager {
         // Read projects
         List<Project> projects = readAllProjects();
         System.out.println("Loaded " + projects.size() + " projects from file.");
+    }
+
+        /**
+     * Find or create an officer by NRIC
+     * @param nric the officer's NRIC
+     * @return HDBOfficer object
+     */
+    private HDBOfficer findOrCreateOfficer(String nric) {
+        try (Scanner scanner = new Scanner(new File("files/resources/OfficerList.csv"))) {
+            // Skip header
+            if (scanner.hasNextLine()) {
+                scanner.nextLine();
+            }
+            
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine().trim();
+                if (line.isEmpty()) continue;
+                
+                String[] fields = line.split(",");
+                if (fields.length < 5) continue;
+                
+                String officerNRIC = fields[1].trim();
+                if (officerNRIC.equalsIgnoreCase(nric)) {
+                    // Create and return the real officer
+                    return new HDBOfficer(
+                        fields[0].trim(), // name
+                        officerNRIC,
+                        fields[4].trim(), // password
+                        Integer.parseInt(fields[2].trim()), // age
+                        fields[3].trim(), // marital status
+                        "HDBOfficer"
+                    );
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error finding officer: " + e.getMessage());
+        }
+        
+        // If not found, create a placeholder
+        return new HDBOfficer(
+            "Officer", 
+            nric, 
+            "password", 
+            30, // placeholder age
+            "Single", // placeholder marital status
+            "HDBOfficer"
+        );
     }
     
     /**
@@ -139,30 +186,33 @@ public class ProjectFileManager {
         try {
             String[] fields = line.split(",");
             
-            if (fields.length < 12) {
+            if (fields.length < 13) {
                 System.out.println("Invalid project record (not enough fields): " + line);
                 return null;
             }
             
+            // Extract project ID (first field)
+            String projectID = fields[0].trim();
+            
             // Extract basic project details
-            String projectName = fields[0];
-            String neighborhood = fields[1];
+            String projectName = fields[1].trim();
+            String neighborhood = fields[2].trim();
             
             // Parse flat types and units
             Map<FlatType, Integer> totalUnits = new HashMap<>();
-            if (fields[2].equals("2-Room") && !fields[3].isEmpty()) {
+            if (fields[3].equals("2-Room") && !fields[4].isEmpty()) {
                 try {
-                    totalUnits.put(FlatType.TWO_ROOM, Integer.parseInt(fields[3]));
+                    totalUnits.put(FlatType.TWO_ROOM, Integer.parseInt(fields[4]));
                 } catch (NumberFormatException e) {
-                    System.out.println("Invalid number format for 2-Room units: " + fields[3]);
+                    System.out.println("Invalid number format for 2-Room units: " + fields[4]);
                 }
             }
             
-            if (fields[5].equals("3-Room") && !fields[6].isEmpty()) {
+            if (fields[6].equals("3-Room") && !fields[7].isEmpty()) {
                 try {
-                    totalUnits.put(FlatType.THREE_ROOM, Integer.parseInt(fields[6]));
+                    totalUnits.put(FlatType.THREE_ROOM, Integer.parseInt(fields[7]));
                 } catch (NumberFormatException e) {
-                    System.out.println("Invalid number format for 3-Room units: " + fields[6]);
+                    System.out.println("Invalid number format for 3-Room units: " + fields[7]);
                 }
             }
             
@@ -170,32 +220,34 @@ public class ProjectFileManager {
             Date openDate;
             Date closeDate;
             try {
-                openDate = DATE_FORMAT.parse(fields[8]);
-                closeDate = DATE_FORMAT.parse(fields[9]);
+                openDate = DATE_FORMAT.parse(fields[9]);
+                closeDate = DATE_FORMAT.parse(fields[10]);
             } catch (ParseException e) {
                 System.out.println("Error parsing dates in project record: " + e.getMessage());
                 return null;
             }
             
-            // Create a temporary manager object - will be replaced later
-            String managerNRIC = fields[10].trim();
-        
-        // CHANGE THIS PART: Find actual manager from ManagerList.csv instead of creating a placeholder
+            // Find manager by NRIC
+            String managerNRIC = fields[11].trim();
             HDBManager manager = findManagerByNRIC(managerNRIC);
             if (manager == null) {
-                // If not found, create temporary placeholder (keep as fallback)
+                // If not found, create temporary placeholder
                 manager = new HDBManager("Manager", managerNRIC, "password", 30, "MARRIED", "HDBManager");
             }
+            
             // Parse officer slots with error handling
             int officerSlots;
             try {
-                officerSlots = Integer.parseInt(fields[11]);
+                officerSlots = Integer.parseInt(fields[12]);
             } catch (NumberFormatException e) {
-                System.out.println("Invalid number format for officer slots: " + fields[11]);
+                System.out.println("Invalid number format for officer slots: " + fields[12]);
                 officerSlots = 5; // Default value
             }
+
+            // Parse officer NRICs (last column)
+
             
-            String projectID = generateProjectID(projectName);
+            // Use the provided project ID instead of generating a new one
             Project project = new Project(
                 projectID,
                 projectName,
@@ -207,6 +259,14 @@ public class ProjectFileManager {
                 officerSlots
             );
             
+            if (fields.length > 13 && !fields[13].trim().isEmpty()) {
+                String[] officerNRICs = fields[13].trim().split(";");
+                for (String nric : officerNRICs) {
+                    HDBOfficer officer = findOrCreateOfficer(nric.trim());
+                    project.addOfficer(officer);
+                }
+            }
+
             // Set project visibility (default true)
             project.setVisible(true);
             
@@ -218,6 +278,7 @@ public class ProjectFileManager {
             return null;
         }
     }
+    
     private HDBManager findManagerByNRIC(String nric) {
         try (Scanner scanner = new Scanner(new File("files/resources/ManagerList.csv"))) {
             // Skip header
@@ -250,16 +311,6 @@ public class ProjectFileManager {
         }
         return null;
     }
-    /**
-     * Generate a simple project ID based on the project name
-     * @param projectName the project name
-     * @return a unique project ID
-     */
-    private String generateProjectID(String projectName) {
-        // Simple algorithm to generate a project ID
-        String prefix = projectName.substring(0, Math.min(3, projectName.length())).toUpperCase();
-        return prefix + System.currentTimeMillis() % 10000;
-    }
     
     /**
      * Save a list of projects to the CSV file
@@ -275,7 +326,7 @@ public class ProjectFileManager {
         
         try (FileWriter fw = new FileWriter(FILE_PATH)) {
             // Write header
-            fw.write("Project Name,Neighborhood,Type 1,Number of units for Type 1,Selling price for Type 1," +
+            fw.write("ProjectID,Project Name,Neighborhood,Type 1,Number of units for Type 1,Selling price for Type 1," +
                      "Type 2,Number of units for Type 2,Selling price for Type 2," +
                      "Application opening date,Application closing date,Manager,Officer Slot,Officer\n");
             
@@ -298,6 +349,9 @@ public class ProjectFileManager {
      */
     private String formatProjectForCSV(Project project) {
         StringBuilder sb = new StringBuilder();
+        
+        // Project ID
+        sb.append(project.getProjectID()).append(",");
         
         // Project Name
         sb.append(project.getProjectName()).append(",");
@@ -326,8 +380,12 @@ public class ProjectFileManager {
         // Officer Slots
         sb.append(project.getAvailableOfficerSlots()).append(",");
         
-        // Officers - placeholder for now
-        sb.append("");
+        // Officers 
+        List<String> officerNRICs = new ArrayList<>();
+        for (HDBOfficer officer : project.getOfficers()) {
+            officerNRICs.add(officer.getNRIC());
+        }
+        sb.append(String.join(";", officerNRICs));
         
         return sb.toString();
     }

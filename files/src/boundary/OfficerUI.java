@@ -37,38 +37,44 @@ public class OfficerUI {
     /**
      * Display the main menu for HDB Officers
      */
-    public void displayMenu() {
+    public boolean displayMenu() {
         boolean exit = false;
+        List<Project> myProjects = currentUser.getHandlingProjects();
+        if (myProjects == null || myProjects.isEmpty()) {
+            myProjects = projectControl.getProjectsByOfficer(currentUser);
+            currentUser.setHandlingProjects(myProjects);
+        }
         
         while (!exit) {
             ScreenUtil.clearScreen();
             System.out.println("\n===== HDB Officer Menu =====");
             System.out.println("Welcome, " + currentUser.getName() + "!");
-            System.out.println("1. View Available Projects");
-            System.out.println("2. View My Applications");
-            System.out.println("3. View My Officer Registrations");
-            System.out.println("4. View Projects I'm Handling");
-            System.out.println("5. Flat Selection & Booking");
-            System.out.println("6. View & Reply to Enquiries");
-            System.out.println("7. View My Profile");
-            System.out.println("8. Change Password");
-            System.out.println("9. Sign Out");
+            System.out.println("1. View My Officer Registrations");
+            System.out.println("2. View Projects I'm Handling");
+            System.out.println("3. Flat Selection & Booking");
+            System.out.println("4. View & Reply to Enquiries");
+            System.out.println("5. View My Profile");
+            System.out.println("6. Switch role to Applicant");
+            System.out.println("7. Change Password");
+            System.out.println("8. Sign Out");
             
             System.out.print("\nEnter your choice: ");
             String choice = sc.nextLine();
             
             switch (choice) {
-                case "1" -> viewAvailableProjects();
-                case "2" -> viewMyApplications();
-                case "3" -> viewOfficerRegistrations();
-                case "4" -> viewHandledProjects();
-                case "5" -> flatSelectionMenu();
-                case "6" -> viewAndReplyToEnquiries();
-                case "7" -> viewProfile();
-                case "8" -> changePassword();
-                case "9" -> {
-                    exit = true;
+                case "1" -> viewOfficerRegistrations();
+                case "2" -> viewHandledProjects(myProjects);
+                case "3" -> flatSelectionMenu();
+                case "4" -> viewAndReplyToEnquiries();
+                case "5" -> viewProfile();
+                case "6" -> {
+                    System.out.println("Switching to Applicant role...");
+                    return false;
+                }
+                case "7" -> changePassword();
+                case "8" -> {
                     System.out.println("Signing out...");
+                    return true;
                 }
                 default -> {
                     System.out.println("Invalid choice. Press Enter to continue.");
@@ -76,6 +82,7 @@ public class OfficerUI {
                 }
             }
         }
+        return false;
     }
     
     /**
@@ -103,17 +110,7 @@ public class OfficerUI {
         sc.nextLine();
     }
     
-    /**
-     * View my applications - implemented similarly to ApplicantUI
-     * This method would be similar to the one in ApplicantUI, so I'm keeping it brief
-     */
-    private void viewMyApplications() {
-        // Implementation similar to ApplicantUI.viewMyApplications()
-        System.out.println("\n===== My Applications =====");
-        System.out.println("This feature is available but not shown for brevity.");
-        System.out.println("Press Enter to continue...");
-        sc.nextLine();
-    }
+    
     
     /**
      * View officer registrations
@@ -157,11 +154,10 @@ public class OfficerUI {
     /**
      * View projects that the officer is handling
      */
-    private void viewHandledProjects() {
+    private void viewHandledProjects(List<Project> handledProjects) {
         ScreenUtil.clearScreen();
         System.out.println("\n===== Projects I'm Handling =====");
         
-        List<Project> handledProjects = currentUser.getHandlingProjects();
         
         if (handledProjects.isEmpty()) {
             System.out.println("You are not currently handling any projects.");

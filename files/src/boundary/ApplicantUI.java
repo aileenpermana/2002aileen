@@ -55,7 +55,7 @@ public class ApplicantUI {
  * Updated displayMenu method for ApplicantUI class
  */
 
-public void displayMenu() {
+ public boolean displayMenu() {
     boolean exit = false;
     
     while (!exit) {
@@ -64,13 +64,25 @@ public void displayMenu() {
         System.out.println("Welcome, " + currentUser.getName() + "!");
         System.out.println("1. View Available Projects");
         System.out.println("2. View My Applications");
-        System.out.println("3. Enquiry Management");  // New option
+        System.out.println("3. Enquiry Management");
         System.out.println("4. View My Profile");
         System.out.println("5. Change Password");
-        System.out.println("6. Sign Out");
+        
+        // Check if the current applicant is also an officer
+        HDBOfficerControl officerControl = new HDBOfficerControl();
+        boolean isOfficer = officerControl.isOfficer(currentUser.getNRIC());
+        
+        if (isOfficer) {
+            System.out.println("6. Switch role to HDB Officer");
+            System.out.println("7. Sign Out");
+        } else {
+            System.out.println("6. Sign Out");
+        }
         
         System.out.print("\nEnter your choice: ");
         String choice = sc.nextLine();
+        
+        int signOutIndex = isOfficer ? 7 : 6;
         
         switch (choice) {
             case "1":
@@ -80,7 +92,7 @@ public void displayMenu() {
                 viewMyApplications();
                 break;
             case "3":
-                displayEnquiryMenu();  // New method
+                displayEnquiryMenu();
                 break;
             case "4":
                 viewProfile();
@@ -88,21 +100,32 @@ public void displayMenu() {
             case "5":
                 changePassword();
                 break;
-            case "6":
-                exit = true;
-                System.out.println("Signing out...");
-                break;
+                case "6": {
+                    if (isOfficer) {
+                        // Switch role to Officer UI
+                        return false; // Return false as this is a role switch, not a sign out
+                    } else {
+                        return true; // Return true to indicate sign out
+                    }
+                }
+                case "7": {
+                    if (isOfficer) {
+                        return true; // Return true to indicate sign out
+                    }
+                    break;
+                }
             default:
                 System.out.println("Invalid choice. Press Enter to continue.");
                 sc.nextLine();
         }
     }
+    return false;
 }
     
-    /**
-     * View all available projects based on eligibility and visibility
-     */
     private void viewAvailableProjects() {
+    boolean exitToMain = false;
+    
+    while (!exitToMain) {
         ScreenUtil.clearScreen();
         System.out.println("\n===== Available Projects =====");
         
@@ -116,146 +139,260 @@ public void displayMenu() {
             return;
         }
         
-        // Show filtering options
-        displayFilterOptions();
+        // Pre-filter to only show projects that are open for application
+        Date currentDate = new Date();
+        eligibleProjects.removeIf(p -> !p.isOpenForApplication());
         
-        // Apply filters and sorting
-        //eligibleProjects = applyFiltersAndSort(eligibleProjects);
+        if (eligibleProjects.isEmpty()) {
+            System.out.println("No projects are currently open for application.");
+            System.out.println("Press Enter to continue...");
+            sc.nextLine();
+            return;
+        }
+        
+        // Always start with alphabetical sorting by default
+        // This ensures projects are displayed immediately in alphabetical order
+        if (!filterPreferences.containsKey("sortBy")) {
+            filterPreferences.put("sortBy", SORT_BY_ALPHABETICAL);
+        }
+        
+        // Apply current filters and sorting
+        List<Project> filteredProjects = applyFiltersAndSort(eligibleProjects);
+        
+        if (filteredProjects.isEmpty()) {
+            System.out.println("\nNo projects match your filter criteria.");
+            System.out.println("Press Enter to continue...");
+            sc.nextLine();
+            return;
+        }
         
         // Display projects
-        displayProjects(eligibleProjects);
+        displayProjects(filteredProjects);
         
         // Project selection submenu
         System.out.println("\nOptions:");
         System.out.println("1. View Project Details");
-        System.out.println("2. Return to Main Menu");
+        System.out.println("2. Filter and Sort Projects");
+        System.out.println("3. Return to Main Menu");
         
         System.out.print("\nEnter your choice: ");
         String choice = sc.nextLine();
         
-        if (choice.equals("1")) {
-            System.out.print("Enter project number to view details: ");
-            try {
-                int projectIndex = Integer.parseInt(sc.nextLine()) - 1;
-                if (projectIndex >= 0 && projectIndex < eligibleProjects.size()) {
-                    viewProjectDetails(eligibleProjects.get(projectIndex));
-                } else {
-                    System.out.println("Invalid project number. Press Enter to continue.");
+        switch (choice) {
+            case "1":
+                System.out.print("Enter project number to view details: ");
+                try {
+                    int projectIndex = Integer.parseInt(sc.nextLine()) - 1;
+                    if (projectIndex >= 0 && projectIndex < filteredProjects.size()) {
+                        viewProjectDetails(filteredProjects.get(projectIndex));
+                    } else {
+                        System.out.println("Invalid project number. Press Enter to continue.");
+                        sc.nextLine();
+                    }
+                } catch (NumberFormatException e) {
+                    System.out.println("Invalid input. Press Enter to continue.");
                     sc.nextLine();
                 }
-            } catch (NumberFormatException e) {
-                System.out.println("Invalid input. Press Enter to continue.");
+                break;
+            case "2":
+                // Show filtering options only when user selects this option
+                displayFilterOptions(eligibleProjects);
+                break;
+            case "3":
+                exitToMain = true;
+                break;
+            default:
+                System.out.println("Invalid choice. Press Enter to continue.");
                 sc.nextLine();
-            }
         }
     }
+}
     
-    /**
-     * Display filtering and sorting options for projects
-     */
-    private void displayFilterOptions() {
-        System.out.println("\n----- Filter and Sort Options -----");
-        System.out.println("Sort by:");
-        System.out.println("1. Flat Type");
-        System.out.println("2. Neighborhood");
-        System.out.println("3. Price Range");
-        System.out.println("4. Closing Date");
-        System.out.println("5. Alphabetical (Default)");
-        System.out.println("6. Availability (Descending)");
-        
-        System.out.print("\nEnter sort option (or press Enter to use previous/default): ");
-        String sortOption = sc.nextLine();
-        
-        if (!sortOption.trim().isEmpty()) {
-            filterPreferences.put("sortBy", sortOption);
+private void displayFilterOptions(List<Project> eligibleProjects) {
+    System.out.println("\n----- Filter and Sort Options -----");
+    System.out.println("Sort by:");
+    System.out.println("1. Flat Types");
+    System.out.println("2. Neighborhood");
+    System.out.println("3. Closing Date (Earliest first)");
+    System.out.println("4. Alphabetical (Default)");
+    System.out.println("5. Availability (Most units first)");
+    
+    System.out.print("\nEnter sort option (or press Enter to use previous/default): ");
+    String sortOption = sc.nextLine();
+    
+    if (!sortOption.trim().isEmpty()) {
+        filterPreferences.put("sortBy", sortOption);
+    }
+    
+    // Get the current sort method
+    String currentSortMethod = (String) filterPreferences.getOrDefault("sortBy", SORT_BY_ALPHABETICAL);
+    
+    // Neighborhood filtering for Neighborhood sort method
+    if (currentSortMethod.equals(SORT_BY_NEIGHBORHOOD)) {
+        Set<String> availableNeighborhoods = new HashSet<>();
+        for (Project p : eligibleProjects) {
+            availableNeighborhoods.add(p.getNeighborhood());
         }
         
-        // Neighborhood filter
-        System.out.print("Filter by Neighborhood (leave blank for all): ");
-        String neighborhood = sc.nextLine();
+        System.out.println("\nAvailable Neighborhoods:");
+        int index = 1;
+        Map<Integer, String> neighborhoodMap = new HashMap<>();
         
-        if (!neighborhood.trim().isEmpty()) {
-            filterPreferences.put("neighborhood", neighborhood);
+        for (String neighborhood : availableNeighborhoods) {
+            System.out.println(index + ". " + neighborhood);
+            neighborhoodMap.put(index, neighborhood);
+            index++;
+        }
+        
+        System.out.print("\nSelect a neighborhood number (0 for all): ");
+        int neighborhoodChoice = 0;
+        try {
+            String input = sc.nextLine();
+            if (!input.trim().isEmpty()) {
+                neighborhoodChoice = Integer.parseInt(input);
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid input. Showing all neighborhoods.");
+        }
+        
+        if (neighborhoodChoice > 0 && neighborhoodChoice < index) {
+            String selectedNeighborhood = neighborhoodMap.get(neighborhoodChoice);
+            filterPreferences.put("neighborhood", selectedNeighborhood);
+            System.out.println("Filtering by: " + selectedNeighborhood);
         } else {
             filterPreferences.remove("neighborhood");
         }
+    }
+    
+    // Flat type filtering for Flat Type and Availability sort methods
+    if (currentSortMethod.equals(SORT_BY_FLAT_TYPE) || 
+        currentSortMethod.equals(SORT_BY_AVAILABILITY)) {
+        System.out.println("\nSelect Flat Type:");
+        System.out.println("1. 2-Room");
+        System.out.println("2. 3-Room");
+        System.out.println("0. All Types");
         
-        // Flat type filter
-        System.out.print("Filter by Flat Type (2-Room/3-Room, leave blank for all): ");
-        String flatType = sc.nextLine();
+        System.out.print("\nSelect a flat type (0 for all): ");
+        int flatTypeChoice = 0;
+        try {
+            String input = sc.nextLine();
+            if (!input.trim().isEmpty()) {
+                flatTypeChoice = Integer.parseInt(input);
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid input. Showing all flat types.");
+        }
         
-        if (!flatType.trim().isEmpty()) {
-            filterPreferences.put("flatType", flatType);
+        if (flatTypeChoice == 1) {
+            filterPreferences.put("flatType", "2-Room");
+            System.out.println("Filtering by: 2-Room flats");
+        } else if (flatTypeChoice == 2) {
+            filterPreferences.put("flatType", "3-Room");
+            System.out.println("Filtering by: 3-Room flats");
         } else {
             filterPreferences.remove("flatType");
         }
     }
+}
     
-    /**
-     * Apply filters and sorting to a list of projects
-     
+    // First, let's restore and update the applyFiltersAndSort method in ApplicantUI.java
+
     private List<Project> applyFiltersAndSort(List<Project> projects) {
         List<Project> filteredProjects = new ArrayList<>(projects);
         
-        // Apply neighborhood filter if specified
-        if (filterPreferences.containsKey("neighborhood")) {
-            Object neighborhoodFilter = filterPreferences.get("neighborhood");
-        }
-        
-        // Apply flat type filter if specified
-        if (filterPreferences.containsKey("flatType")) {
-            Object flatTypeFilter = filterPreferences.get("flatType");
-            // Convert to FlatType enum
-            String flatType = (String) flatTypeFilter;
-            FlatType type = null;
-            
-            if (flatType.equalsIgnoreCase("2-Room")) {
-                type = FlatType.TWO_ROOM;
-            } else if (flatType.equalsIgnoreCase("3-Room")) {
-                type = FlatType.THREE_ROOM;
-            }
-            
-            if (type != null) {
-                FlatType finalType = type;
-                filteredProjects.removeIf(p -> !p.hasFlatType(finalType));
-            }
-        }
+        // Filter for current date - only show projects that are currently open for application
+        Date currentDate = new Date(); // Today's date
+        filteredProjects.removeIf(p -> !p.isOpenForApplication());
         
         // Apply sorting
-        Object sortBy = filterPreferences.getOrDefault("sortBy", SORT_BY_ALPHABETICAL);
+        String sortBy = (String) filterPreferences.getOrDefault("sortBy", SORT_BY_ALPHABETICAL);
         
         switch (sortBy) {
-            case SORT_BY_FLAT_TYPE:
-                // Sort by number of flat types
-                filteredProjects.sort(Comparator.comparing(p -> p.getFlatTypes().size()));
-                break;
             case SORT_BY_NEIGHBORHOOD:
+                // Apply neighborhood filter
+                if (filterPreferences.containsKey("neighborhood")) {
+                    String neighborhood = (String) filterPreferences.get("neighborhood");
+                    if (neighborhood != null && !neighborhood.trim().isEmpty()) {
+                        filteredProjects.removeIf(p -> !p.getNeighborhood().equalsIgnoreCase(neighborhood));
+                    }
+                }
+                // Sort by neighborhood
                 filteredProjects.sort(Comparator.comparing(Project::getNeighborhood));
                 break;
-            case SORT_BY_PRICE_RANGE:
-                // This would require price data, using project ID as placeholder
-                filteredProjects.sort(Comparator.comparing(Project::getProjectID));
-                break;
+            
             case SORT_BY_CLOSING_DATE:
+                // Sort by closing date (earliest first)
                 filteredProjects.sort(Comparator.comparing(Project::getApplicationCloseDate));
                 break;
+            
+            case SORT_BY_FLAT_TYPE:
             case SORT_BY_AVAILABILITY:
-                // Sort by total available units (descending)
-                filteredProjects.sort((p1, p2) -> {
-                    int p1Available = calculateTotalAvailableUnits(p1);
-                    int p2Available = calculateTotalAvailableUnits(p2);
-                    return Integer.compare(p2Available, p1Available); // Descending
-                });
+                // Apply flat type filter
+                if (filterPreferences.containsKey("flatType")) {
+                    String flatTypeStr = (String) filterPreferences.get("flatType");
+                    FlatType type = null;
+                    
+                    if (flatTypeStr.equalsIgnoreCase("2-Room")) {
+                        type = FlatType.TWO_ROOM;
+                    } else if (flatTypeStr.equalsIgnoreCase("3-Room")) {
+                        type = FlatType.THREE_ROOM;
+                    }
+                    
+                    if (type != null) {
+                        final FlatType finalType = type;
+                        // Filter projects that have this flat type AND have available units
+                        filteredProjects.removeIf(p -> !p.hasFlatType(finalType) || p.getAvailableUnitsByType(finalType) <= 0);
+                    }
+                }
+                
+                // Sort by total available units (descending) if SORT_BY_AVAILABILITY
+                if (sortBy.equals(SORT_BY_AVAILABILITY)) {
+                    filteredProjects.sort((p1, p2) -> {
+                        int p1Available = calculateTotalAvailableUnits(p1);
+                        int p2Available = calculateTotalAvailableUnits(p2);
+                        return Integer.compare(p2Available, p1Available); // Descending
+                    });
+                } else {
+                    // Sort by number of distinct flat types
+                    filteredProjects.sort(Comparator.comparing(p -> p.getFlatTypes().size()));
+                }
                 break;
+            
             case SORT_BY_ALPHABETICAL:
             default:
+                // Optionally apply neighborhood filter if set
+                if (filterPreferences.containsKey("neighborhood")) {
+                    String neighborhood = (String) filterPreferences.get("neighborhood");
+                    if (neighborhood != null && !neighborhood.trim().isEmpty()) {
+                        filteredProjects.removeIf(p -> !p.getNeighborhood().equalsIgnoreCase(neighborhood));
+                    }
+                }
+                
+                // Optionally apply flat type filter if set
+                if (filterPreferences.containsKey("flatType")) {
+                    String flatTypeStr = (String) filterPreferences.get("flatType");
+                    FlatType type = null;
+                    
+                    if (flatTypeStr.equalsIgnoreCase("2-Room")) {
+                        type = FlatType.TWO_ROOM;
+                    } else if (flatTypeStr.equalsIgnoreCase("3-Room")) {
+                        type = FlatType.THREE_ROOM;
+                    }
+                    
+                    if (type != null) {
+                        final FlatType finalType = type;
+                        // Filter projects that have this flat type AND have available units
+                        filteredProjects.removeIf(p -> !p.hasFlatType(finalType) || p.getAvailableUnitsByType(finalType) <= 0);
+                    }
+                }
+                
+                // Sort by project name
                 filteredProjects.sort(Comparator.comparing(Project::getProjectName));
                 break;
         }
         
         return filteredProjects;
     }
-        */
     
     /**
      * Calculate total available units across all flat types
@@ -268,34 +405,53 @@ public void displayMenu() {
         return total;
     }
     
-    /**
-     * Display a list of projects
-     * @param projects the projects to display
-     */
     private void displayProjects(List<Project> projects) {
         SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
+        Date currentDate = new Date();
         
         System.out.println("\n----- Available Projects -----");
-        System.out.printf("%-5s %-20s %-15s %-20s %-15s\n", 
-                         "No.", "Project Name", "Neighborhood", "Closing Date", "Available Units");
-        System.out.println("--------------------------------------------------------------------------------");
+        System.out.printf("%-5s %-20s %-15s %-20s %-20s %-15s\n", 
+                         "No.", "Project Name", "Neighborhood", "Closing Date", "Days Remaining", "Available Units");
+        System.out.println("------------------------------------------------------------------------------------------------");
         
         for (int i = 0; i < projects.size(); i++) {
             Project p = projects.get(i);
             int totalAvailable = calculateTotalAvailableUnits(p);
             
-            System.out.printf("%-5d %-20s %-15s %-20s %-15d\n", 
+            // Calculate days remaining until closing date
+            long diffInMillies = p.getApplicationCloseDate().getTime() - currentDate.getTime();
+            long diffInDays = diffInMillies / (24 * 60 * 60 * 1000);
+            
+            System.out.printf("%-5d %-20s %-15s %-20s %-20d %-15d\n", 
                             (i + 1),
                             truncateString(p.getProjectName(), 20),
                             truncateString(p.getNeighborhood(), 15),
                             dateFormat.format(p.getApplicationCloseDate()),
+                            diffInDays,
                             totalAvailable);
         }
+        
+        // Only show flat type availability when sorting by flat type
+        String currentSortMethod = (String) filterPreferences.getOrDefault("sortBy", SORT_BY_ALPHABETICAL);
+        if (currentSortMethod.equals(SORT_BY_FLAT_TYPE)) {
+            System.out.println("\nFlat Type Availability:");
+            System.out.printf("%-5s %-20s %-20s %-20s\n", 
+                             "No.", "Project Name", "2-Room Available", "3-Room Available");
+            System.out.println("--------------------------------------------------------------------------");
+            
+            for (int i = 0; i < projects.size(); i++) {
+                Project p = projects.get(i);
+                int twoRoomAvailable = p.getAvailableUnitsByType(FlatType.TWO_ROOM);
+                int threeRoomAvailable = p.getAvailableUnitsByType(FlatType.THREE_ROOM);
+                
+                System.out.printf("%-5d %-20s %-20d %-20d\n", 
+                                (i + 1),
+                                truncateString(p.getProjectName(), 20),
+                                twoRoomAvailable,
+                                threeRoomAvailable);
+            }
+        }
     }
-    
-    /**
- * Methods to add to the ApplicantUI class for enquiry management
- */
 
 /**
  * Display the enquiry menu
@@ -630,36 +786,62 @@ private void deleteEnquiry(List<Enquiry> enquiries) {
         return str.substring(0, maxLength - 3) + "...";
     }
     
-    /**
-     * View details of a specific project
-     * @param project the project to view
-     */
     private void viewProjectDetails(Project project) {
         ScreenUtil.clearScreen();
         SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
+        Date currentDate = new Date();
         
         System.out.println("\n===== Project Details =====");
+        System.out.println("Project ID: " + project.getProjectID());
         System.out.println("Project Name: " + project.getProjectName());
         System.out.println("Neighborhood: " + project.getNeighborhood());
-        System.out.println("Application Period: " + 
-                         dateFormat.format(project.getApplicationOpenDate()) + " to " + 
-                         dateFormat.format(project.getApplicationCloseDate()));
+        
+        System.out.println("\nApplication Period:");
+        System.out.println("Opening Date: " + dateFormat.format(project.getApplicationOpenDate()));
+        System.out.println("Closing Date: " + dateFormat.format(project.getApplicationCloseDate()));
+        
+        // Calculate days remaining until closing
+        long diffInMillies = project.getApplicationCloseDate().getTime() - currentDate.getTime();
+        long diffInDays = diffInMillies / (24 * 60 * 60 * 1000);
+        System.out.println("Days Remaining: " + diffInDays);
+        
+        // Verify application is open
+        if (project.isOpenForApplication()) {
+            System.out.println("Status: OPEN FOR APPLICATION");
+        } else if (currentDate.before(project.getApplicationOpenDate())) {
+            System.out.println("Status: NOT YET OPEN");
+        } else {
+            System.out.println("Status: CLOSED");
+        }
         
         System.out.println("\nFlat Types Available:");
         
-        // For singles, only show 2-Room
+        // Show flat types based on eligibility
         if (currentUser.getMaritalStatus() == MaritalStatus.SINGLE) {
-            if (project.hasFlatType(FlatType.TWO_ROOM)) {
-                System.out.println("- " + FlatType.TWO_ROOM.getDisplayValue() + ": " + 
-                                project.getAvailableUnitsByType(FlatType.TWO_ROOM) + " units available out of " + 
-                                project.getTotalUnitsByType(FlatType.TWO_ROOM));
+            if (currentUser.getAge() >= 35) {
+                // Singles 35 and above can only apply for 2-Room
+                if (project.hasFlatType(FlatType.TWO_ROOM)) {
+                    System.out.println("2-Room: " + 
+                                 project.getAvailableUnitsByType(FlatType.TWO_ROOM) + " units available out of " + 
+                                 project.getTotalUnitsByType(FlatType.TWO_ROOM));
+                } else {
+                    System.out.println("No eligible flat types for single applicants.");
+                }
+            } else {
+                System.out.println("Single applicants must be 35 years or older to apply.");
             }
         } else {
-            // For married, show all flat types
-            for (FlatType type : project.getFlatTypes()) {
-                System.out.println("- " + type.getDisplayValue() + ": " + 
-                                project.getAvailableUnitsByType(type) + " units available out of " + 
-                                project.getTotalUnitsByType(type));
+            // For married couples, show all flat types
+            if (project.hasFlatType(FlatType.TWO_ROOM)) {
+                System.out.println("2-Room: " + 
+                             project.getAvailableUnitsByType(FlatType.TWO_ROOM) + " units available out of " + 
+                             project.getTotalUnitsByType(FlatType.TWO_ROOM));
+            }
+            
+            if (project.hasFlatType(FlatType.THREE_ROOM)) {
+                System.out.println("3-Room: " + 
+                             project.getAvailableUnitsByType(FlatType.THREE_ROOM) + " units available out of " + 
+                             project.getTotalUnitsByType(FlatType.THREE_ROOM));
             }
         }
         
@@ -695,6 +877,7 @@ private void deleteEnquiry(List<Enquiry> enquiries) {
      * @param project the project to apply for
      */
     private void applyForProject(Project project) {
+        
         // Confirm application
         System.out.print("Confirm application for " + project.getProjectName() + "? (Y/N): ");
         String confirm = sc.nextLine();
@@ -720,24 +903,6 @@ private void deleteEnquiry(List<Enquiry> enquiries) {
      * @param project the project to register for
      */
     private void registerAsOfficer(Project project) {
-        // Check if there are available officer slots
-        if (project.getAvailableOfficerSlots() <= 0) {
-            System.out.println("No available officer slots for this project.");
-            System.out.println("Press Enter to continue...");
-            sc.nextLine();
-            return;
-        }
-        
-        // Check if already registered or applied for this project
-        for (Application app : currentUser.getApplications()) {
-            if (app.getProject().equals(project)) {
-                System.out.println("You have already applied for this project as an Applicant.");
-                System.out.println("You cannot be both an Applicant and an Officer for the same project.");
-                System.out.println("Press Enter to continue...");
-                sc.nextLine();
-                return;
-            }
-        }
         
         // Confirm registration
         System.out.print("Confirm registration as HDB Officer for " + project.getProjectName() + "? (Y/N): ");
@@ -754,7 +919,7 @@ private void deleteEnquiry(List<Enquiry> enquiries) {
                 "HDBOfficer"
             );
             
-            boolean success = officerControl.registerOfficer(tempOfficer, project);
+            boolean success = officerControl.registerOfficerCandidate(tempOfficer, project);
             
             if (success) {
                 System.out.println("Registration submitted successfully! Your registration is pending approval.");

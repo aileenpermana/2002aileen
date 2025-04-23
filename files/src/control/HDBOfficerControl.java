@@ -26,14 +26,29 @@ public class HDBOfficerControl {
      */
     public List<Map<String, Object>> getOfficerRegistrations(HDBOfficer officer) {
         List<Map<String, Object>> registrations = new ArrayList<>();
-        
-        // Also check for registrations with matching NRIC (for applicants checking their officer registrations)
         String officerNRIC = officer.getNRIC();
         
         for (Map<String, Object> reg : officerRegistrations) {
-            HDBOfficer regOfficer = (HDBOfficer) reg.get("officer");
-            if (regOfficer.getOfficerID().equals(officer.getOfficerID()) || 
-                regOfficer.getNRIC().equals(officerNRIC)) {
+            User regUser = (User) reg.get("officer");
+            if (regUser.getNRIC().equals(officerNRIC)) {
+                registrations.add(reg);
+            }
+        }
+        
+        return registrations;
+    }
+    
+    /**
+     * Get officer registrations by NRIC
+     * @param nric the user's NRIC
+     * @return list of registration records
+     */
+    public List<Map<String, Object>> getOfficerRegistrationsByNRIC(String nric) {
+        List<Map<String, Object>> registrations = new ArrayList<>();
+        
+        for (Map<String, Object> reg : officerRegistrations) {
+            User regUser = (User) reg.get("officer");
+            if (regUser.getNRIC().equals(nric)) {
                 registrations.add(reg);
             }
         }
@@ -58,6 +73,92 @@ public class HDBOfficerControl {
         
         return registrations;
     }
+
+        /**
+     * Check if a user is registered as an HDB Officer
+     * @param nric the NRIC to check
+     * @return true if the user is an officer, false otherwise
+     */
+    public boolean isOfficer(String nric) {
+        try {
+            File officerFile = new File("files/resources/OfficerList.csv");
+            
+            if (!officerFile.exists()) {
+                return false;
+            }
+            
+            try (Scanner scanner = new Scanner(officerFile)) {
+                // Skip header
+                if (scanner.hasNextLine()) {
+                    scanner.nextLine();
+                }
+                
+                while (scanner.hasNextLine()) {
+                    String line = scanner.nextLine().trim();
+                    if (line.isEmpty()) continue;
+                    
+                    String[] fields = line.split(",");
+                    if (fields.length < 2) continue;
+                    
+                    if (fields[1].trim().equalsIgnoreCase(nric)) {
+                        return true;
+                    }
+                }
+            }
+        } catch (FileNotFoundException e) {
+            System.err.println("Error checking officer status: " + e.getMessage());
+        }
+        
+        return false;
+    }
+        
+        // Add this method to HDBOfficerControl to sync officer projects on startup
+    public void syncOfficerProjects() {
+        // Loop through officer registrations
+        for (Map<String, Object> reg : officerRegistrations) {
+            HDBOfficer officer = (HDBOfficer) reg.get("officer");
+            Project project = (Project) reg.get("project");
+            RegistrationStatus status = (RegistrationStatus) reg.get("status");
+            
+            // If registration is approved, ensure the officer is handling the project
+            if (status == RegistrationStatus.APPROVED) {
+                officer.addHandlingProject(project);
+                project.addOfficer(officer);
+            }
+        }
+    }
+        /**
+     * Get all approved officers for a project
+     * @param project the project
+     * @return list of approved officers
+     */
+    public List<HDBOfficer> getApprovedOfficersForProject(Project project) {
+        List<HDBOfficer> approvedOfficers = new ArrayList<>();
+        
+        // First get from the project's officers list which is guaranteed to contain HDBOfficers
+        approvedOfficers.addAll(project.getOfficers());
+        
+        // Then add any from registrations that may not be in the project's list yet
+        for (Map<String, Object> reg : officerRegistrations) {
+            Project regProject = (Project) reg.get("project");
+            RegistrationStatus status = (RegistrationStatus) reg.get("status");
+            
+            if (regProject.getProjectID().equals(project.getProjectID()) && 
+                status == RegistrationStatus.APPROVED) {
+                
+                Object officer = reg.get("officer");
+                // Only add if it's an HDBOfficer and not already in the list
+                if (officer instanceof HDBOfficer) {
+                    HDBOfficer hdbOfficer = (HDBOfficer) officer;
+                    if (!approvedOfficers.contains(hdbOfficer)) {
+                        approvedOfficers.add(hdbOfficer);
+                    }
+                }
+            }
+        }
+        
+        return approvedOfficers;
+    }
     
     /**
      * Get pending officer registrations for a project
@@ -81,18 +182,18 @@ public class HDBOfficerControl {
     }
     
     /**
-     * Register an officer for a project
-     * @param officer the officer
+     * Register a user as an officer candidate for a project
+     * @param user the user registering (Applicant or HDBOfficer)
      * @param project the project
      * @return true if registration is successful, false otherwise
      */
-    public boolean registerOfficer(HDBOfficer officer, Project project) {
-        // Check if officer is already registered for this project
+    public boolean registerOfficerCandidate(User user, Project project) {
+        // Check if user is already registered for this project
         for (Map<String, Object> reg : officerRegistrations) {
-            HDBOfficer regOfficer = (HDBOfficer) reg.get("officer");
+            User regUser = (User) reg.get("officer");
             Project regProject = (Project) reg.get("project");
             
-            if (regOfficer.getNRIC().equals(officer.getNRIC()) && 
+            if (regUser.getNRIC().equals(user.getNRIC()) && 
                 regProject.getProjectID().equals(project.getProjectID())) {
                 System.out.println("You are already an officer for this project.");
                 return false; // Already registered
@@ -105,22 +206,38 @@ public class HDBOfficerControl {
             return false;
         }
         
-        // Check if officer is handling another project in the same period
-        if (officer.isHandlingProject(project.getApplicationOpenDate(), project.getApplicationCloseDate())) {
-            System.out.println("You are already handling another project in the same period.");
-            return false;
+        // Check if applicant is handling another project in the same period
+        // This would require checking all approved registrations
+        for (Map<String, Object> reg : officerRegistrations) {
+            User regUser = (User) reg.get("officer");
+            Project regProject = (Project) reg.get("project");
+            RegistrationStatus status = (RegistrationStatus) reg.get("status");
+            
+            if (regUser.getNRIC().equals(user.getNRIC()) && 
+                status == RegistrationStatus.APPROVED) {
+                // Check if date ranges overlap
+                Date start1 = regProject.getApplicationOpenDate();
+                Date end1 = regProject.getApplicationCloseDate();
+                Date start2 = project.getApplicationOpenDate();
+                Date end2 = project.getApplicationCloseDate();
+                
+                // Check if date ranges overlap
+                if (!(end1.before(start2) || start1.after(end2))) {
+                    return false; // Date ranges overlap
+                }
+            }
         }
         
-        // Check if officer has applied for this project as an applicant
+        // Check if user has applied for this project as an applicant
         ApplicationControl appControl = new ApplicationControl();
-        if (appControl.hasApplicationForProject(officer.getNRIC(), project)) {
+        if (appControl.hasApplicationForProject(user.getNRIC(), project)) {
             System.out.println("You cannot be both an applicant and an officer for the same project.");
             return false; // Cannot be both applicant and officer for same project
         }
         
         // Create registration record
         Map<String, Object> registration = new HashMap<>();
-        registration.put("officer", officer);
+        registration.put("officer", user); // Store the user directly
         registration.put("project", project);
         registration.put("status", RegistrationStatus.PENDING);
         registration.put("date", new Date());
@@ -133,49 +250,188 @@ public class HDBOfficerControl {
     }
     
     /**
-     * Update the status of an officer registration
-     * @param officer the officer
-     * @param project the project
-     * @param status the new status
-     * @return true if update is successful, false otherwise
-     */
-    public boolean updateRegistrationStatus(HDBOfficer officer, Project project, RegistrationStatus status) {
-        // Find and update registration
-        for (Map<String, Object> reg : officerRegistrations) {
-            HDBOfficer regOfficer = (HDBOfficer) reg.get("officer");
-            Project regProject = (Project) reg.get("project");
+ * Process the registration of an officer candidate with file update
+ * This should replace the existing processOfficerRegistration method in HDBOfficerControl
+ * 
+ * @param user the original user who registered
+ * @param project the project
+ * @param approve true to approve, false to reject
+ * @return true if processing was successful, false otherwise
+ */
+public boolean processOfficerRegistration(User user, Project project, boolean approve) {
+    // Find the registration
+    for (Map<String, Object> reg : officerRegistrations) {
+        User regUser = (User) reg.get("officer");
+        Project regProject = (Project) reg.get("project");
+        RegistrationStatus status = (RegistrationStatus) reg.get("status");
+        
+        if (regUser.getNRIC().equals(user.getNRIC()) && 
+            regProject.getProjectID().equals(project.getProjectID()) &&
+            status == RegistrationStatus.PENDING) {
             
-            if (regOfficer.getNRIC().equals(officer.getNRIC()) && 
-                regProject.getProjectID().equals(project.getProjectID())) {
-                
-                // If already has this status, nothing to do
-                if (reg.get("status") == status) {
-                    return true;
+            if (approve) {
+                // Check for available slots
+                if (project.getAvailableOfficerSlots() <= 0) {
+                    return false;
                 }
                 
-                reg.put("status", status);
-                
-                // If approved, add officer to project
-                if (status == RegistrationStatus.APPROVED) {
-                    // Add officer to project
-                    project.addOfficer(officer);
+                // Convert to HDBOfficer if not already one
+                HDBOfficer officer;
+                if (regUser instanceof HDBOfficer) {
+                    officer = (HDBOfficer) regUser;
+                } else {
+                    // Create new HDBOfficer using actual user data
+                    // First try to find actual user data
+                    User actualUser = UserDataLookup.findUserByNRIC(regUser.getNRIC());
                     
-                    // Add project to officer's handling list
-                    officer.addHandlingProject(project);
+                    if (actualUser != null) {
+                        // Create HDBOfficer with actual user data
+                        officer = new HDBOfficer(
+                            actualUser.getName(),
+                            actualUser.getNRIC(),
+                            actualUser.getPassword(),
+                            actualUser.getAge(),
+                            actualUser.getMaritalStatus(),
+                            "HDBOfficer"
+                        );
+                    } else {
+                        // Create with regUser data as fallback
+                        officer = new HDBOfficer(
+                            regUser.getName(),
+                            regUser.getNRIC(),
+                            regUser.getPassword(),
+                            regUser.getAge(),
+                            regUser.getMaritalStatus(),
+                            "HDBOfficer"
+                        );
+                    }
                     
-                    // Decrement available slots
-                    project.decrementOfficerSlots();
-                    
-                    // Update project
-                    ProjectControl projectControl = new ProjectControl();
-                    projectControl.updateProject(project);
+                    // Add the user to OfficerList.csv if they don't already exist there
+                    if (!isUserInOfficerFile(officer.getNRIC())) {
+                        addUserToOfficerFile(officer);
+                    }
                 }
                 
-                return saveOfficerRegistrations();
+                // Update the registration
+                reg.put("officer", officer);
+                reg.put("status", RegistrationStatus.APPROVED);
+                
+                // Add officer to project
+                project.addOfficer(officer);
+                
+                // Add project to officer's handling list
+                officer.addHandlingProject(project);
+                
+                // Update project
+                ProjectControl projectControl = new ProjectControl();
+                projectControl.updateProject(project);
+            } else {
+                // Reject the registration
+                reg.put("status", RegistrationStatus.REJECTED);
+            }
+            
+            // Save changes
+            return saveOfficerRegistrations();
+        }
+    }
+    
+    return false; // Registration not found
+}
+
+/**
+ * Check if a user already exists in the OfficerList.csv file
+ * @param nric the user's NRIC
+ * @return true if user exists, false otherwise
+ */
+private boolean isUserInOfficerFile(String nric) {
+    File officerFile = new File("files/resources/OfficerList.csv");
+    if (!officerFile.exists()) {
+        return false;
+    }
+    
+    try (Scanner scanner = new Scanner(officerFile)) {
+        // Skip header
+        if (scanner.hasNextLine()) {
+            scanner.nextLine();
+        }
+        
+        while (scanner.hasNextLine()) {
+            String line = scanner.nextLine().trim();
+            if (line.isEmpty()) continue;
+            
+            String[] values = line.split(",");
+            if (values.length < 2) continue;
+            
+            if (values[1].trim().equalsIgnoreCase(nric)) {
+                return true; // Found the user
+            }
+        }
+    } catch (Exception e) {
+        System.err.println("Error checking officer file: " + e.getMessage());
+    }
+    
+    return false;
+}
+
+/**
+ * Add a user to the OfficerList.csv file
+ * @param officer the officer to add
+ * @return true if successful, false otherwise
+ */
+private boolean addUserToOfficerFile(HDBOfficer officer) {
+    File officerFile = new File("files/resources/OfficerList.csv");
+    boolean fileExists = officerFile.exists();
+    
+    try {
+        // Create parent directories if they don't exist
+        File parentDir = officerFile.getParentFile();
+        if (parentDir != null && !parentDir.exists()) {
+            parentDir.mkdirs();
+        }
+        
+        try (FileWriter fw = new FileWriter(officerFile, true);
+             BufferedWriter bw = new BufferedWriter(fw);
+             PrintWriter out = new PrintWriter(bw)) {
+            
+            // Add header if file is new
+            if (!fileExists) {
+                out.println("Name,NRIC,Age,Marital Status,Password");
+            }
+            
+            // Append the officer data
+            out.println(
+                officer.getName() + "," +
+                officer.getNRIC() + "," +
+                officer.getAge() + "," +
+                officer.getMaritalStatusDisplayValue() + "," +
+                officer.getPassword()
+            );
+            
+            return true;
+        }
+    } catch (IOException e) {
+        System.err.println("Error adding user to officer file: " + e.getMessage());
+        return false;
+    }
+}
+    
+    /**
+     * Check if a user is already an approved officer
+     * @param nric the user's NRIC
+     * @return true if already approved as an officer for any project, false otherwise
+     */
+    public boolean isAlreadyOfficer(String nric) {
+        for (Map<String, Object> reg : officerRegistrations) {
+            User regUser = (User) reg.get("officer");
+            RegistrationStatus status = (RegistrationStatus) reg.get("status");
+            
+            if (regUser.getNRIC().equals(nric) && 
+                status == RegistrationStatus.APPROVED) {
+                return true;
             }
         }
         
-        return false; // Registration not found
+        return false;
     }
     
     /**
@@ -224,15 +480,41 @@ public class HDBOfficerControl {
                         // Convert status string to enum
                         RegistrationStatus status = RegistrationStatus.valueOf(statusStr);
                         
-                        // Find or create officer
-                        HDBOfficer officer = findOrCreateOfficer(officerNRIC);
+                        // Find or create user/officer based on status and actual user data
+                        User user;
+                        
+                        // First try to find the actual user data
+                        User actualUser = UserDataLookup.findUserByNRIC(officerNRIC);
+                        
+                        if (status == RegistrationStatus.APPROVED) {
+                            // For approved registrations, create as HDBOfficer
+                            if (actualUser != null) {
+                                user = new HDBOfficer(
+                                    actualUser.getName(),
+                                    officerNRIC,
+                                    actualUser.getPassword(),
+                                    actualUser.getAge(),
+                                    actualUser.getMaritalStatus(),
+                                    "HDBOfficer"
+                                );
+                            } else {
+                                user = UserDataLookup.createFallbackUser(officerNRIC, "HDBOfficer");
+                            }
+                        } else {
+                            // For pending/rejected, create as the original user type
+                            if (actualUser != null) {
+                                user = actualUser;
+                            } else {
+                                user = UserDataLookup.createFallbackUser(officerNRIC, "Applicant");
+                            }
+                        }
                         
                         // Find or create project
                         Project project = findOrCreateProject(projectID);
                         
                         // Create registration record
                         Map<String, Object> registration = new HashMap<>();
-                        registration.put("officer", officer);
+                        registration.put("officer", user);
                         registration.put("project", project);
                         registration.put("status", status);
                         registration.put("date", new Date(registrationDate));
@@ -270,13 +552,13 @@ public class HDBOfficerControl {
                 
                 // Write registrations
                 for (Map<String, Object> reg : officerRegistrations) {
-                    HDBOfficer officer = (HDBOfficer) reg.get("officer");
+                    User user = (User) reg.get("officer");
                     Project project = (Project) reg.get("project");
                     RegistrationStatus status = (RegistrationStatus) reg.get("status");
                     Date date = (Date) reg.get("date");
                     
                     writer.println(
-                        officer.getNRIC() + "," +
+                        user.getNRIC() + "," +
                         project.getProjectID() + "," +
                         status + "," +
                         date.getTime()
@@ -286,126 +568,9 @@ public class HDBOfficerControl {
             
             return true;
         } catch (IOException e) {
-            System.err.println("Error saving receipt: " + e.getMessage());
+            System.err.println("Error saving officer registrations: " + e.getMessage());
             return false;
         }
-    }
-    
-    /**
-     * Find an application by NRIC and project
-     * @param nric the applicant's NRIC
-     * @param project the project
-     * @return the application, or null if not found
-     */
-    public Application findApplicationByNRICAndProject(String nric, Project project) {
-        // Delegate to ApplicationControl to find the application
-        ApplicationControl appControl = new ApplicationControl();
-        return appControl.findApplicationByNRICAndProject(nric, project);
-    }
-    
-    /**
-     * Get all handled projects by an officer
-     * @param officer the HDB officer
-     * @return list of projects the officer is handling
-     */
-    public List<Project> getHandledProjects(HDBOfficer officer) {
-        List<Project> handledProjects = new ArrayList<>();
-        
-        for (Map<String, Object> reg : officerRegistrations) {
-            HDBOfficer regOfficer = (HDBOfficer) reg.get("officer");
-            Project project = (Project) reg.get("project");
-            RegistrationStatus status = (RegistrationStatus) reg.get("status");
-            
-            if (regOfficer.getNRIC().equals(officer.getNRIC()) && 
-                status == RegistrationStatus.APPROVED) {
-                handledProjects.add(project);
-            }
-        }
-        
-        return handledProjects;
-    }
-    
-    /**
-     * Reply to an enquiry
-     * @param enquiry the enquiry to reply to
-     * @param officer the officer making the reply
-     * @param replyContent the reply content
-     * @return true if reply was successful, false otherwise
-     */
-    public boolean replyToEnquiry(Enquiry enquiry, HDBOfficer officer, String replyContent) {
-        // Check if officer is handling the project
-        if (!officer.isHandlingProject(enquiry.getProject())) {
-            return false;
-        }
-        
-        // Format reply with officer info
-        String formattedReply = "HDB Officer " + officer.getName() + " [" + 
-                             officer.getOfficerID() + "]: " + replyContent;
-        
-        // Add reply to enquiry
-        EnquiryControl enquiryControl = new EnquiryControl();
-        return enquiryControl.addReply(enquiry, formattedReply, officer);
-    }
-    
-    /**
-     * Get booked applications for a project
-     * @param project the project
-     * @return list of booked applications
-     */
-    public List<Application> getBookedApplications(Project project) {
-        ApplicationControl appControl = new ApplicationControl();
-        return appControl.getBookedApplications(project);
-    }
-    
-    /**
-     * Get successful (approved but not yet booked) applications for a project
-     * @param project the project
-     * @return list of successful applications
-     */
-    public List<Application> getSuccessfulApplications(Project project) {
-        ApplicationControl appControl = new ApplicationControl();
-        return appControl.getSuccessfulApplications(project);
-    }
-    
-    /**
-     * Check if a user is already an officer for a project
-     * @param nric the user's NRIC
-     * @param project the project
-     * @return true if user is an officer for the project, false otherwise
-     */
-    public boolean isOfficerForProject(String nric, Project project) {
-        for (Map<String, Object> reg : officerRegistrations) {
-            HDBOfficer regOfficer = (HDBOfficer) reg.get("officer");
-            Project regProject = (Project) reg.get("project");
-            RegistrationStatus status = (RegistrationStatus) reg.get("status");
-            
-            if (regOfficer.getNRIC().equals(nric) && 
-                regProject.getProjectID().equals(project.getProjectID()) &&
-                status == RegistrationStatus.APPROVED) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-
-    
-    /**
-     * Helper method to find or create an officer by NRIC
-     * @param nric the officer's NRIC
-     * @return the officer object
-     */
-    private HDBOfficer findOrCreateOfficer(String nric) {
-        // In a real system, this would check a database or repository
-        // For now, create a placeholder officer
-        return new HDBOfficer(
-            "Officer", // Placeholder name
-            nric,
-            "password",
-            30, // Placeholder age
-            "Married", // Placeholder marital status
-            "HDBOfficer"
-        );
     }
     
     /**
@@ -427,7 +592,7 @@ public class HDBOfficerControl {
         // If not found, create a placeholder
         return new Project(
             projectID,
-            "Project", // Placeholder name
+            "Project " + projectID, // Placeholder name
             "Neighborhood", // Placeholder neighborhood
             new HashMap<>(), // Placeholder units
             new Date(), // Placeholder open date
@@ -437,59 +602,8 @@ public class HDBOfficerControl {
         );
     }
     
-    /**
-     * Book a flat for an applicant
-     * @param officer the HDB officer processing the booking
-     * @param application the application
-     * @param flatType the flat type to book
-     * @return true if booking is successful, false otherwise
-     */
-    public boolean bookFlat(HDBOfficer officer, Application application, FlatType flatType) {
-        // Check if officer is handling the project
-        if (!officer.isHandlingProject(application.getProject())) {
-            return false;
-        }
-        
-        // Check if application is successful and can be booked
-        if (!application.canBook()) {
-            return false;
-        }
-        
-        Project project = application.getProject();
-        
-        // Check if there are available units of this type
-        if (project.getAvailableUnitsByType(flatType) <= 0) {
-            return false;
-        }
-        
-        // Generate a new flat
-        String flatID = "F" + project.getProjectID() + "-" + flatType.toString().charAt(0) + "-" + 
-                       (project.getTotalUnitsByType(flatType) - project.getAvailableUnitsByType(flatType) + 1);
-        
-        Flat newFlat = new Flat(flatID, project, flatType);
-        
-        // Book the flat
-        newFlat.setBookedByApplication(application);
-        application.setBookedFlat(newFlat);
-        application.setStatus(ApplicationStatus.BOOKED);
-        
-        // Update the applicant
-        Applicant applicant = application.getApplicant();
-        applicant.setBookedFlat(newFlat);
-        
-        // Update available units count
-        project.decrementAvailableUnits(flatType);
-        
-        // Update application in storage
-        ApplicationControl appControl = new ApplicationControl();
-        appControl.updateApplication(application);
-        
-        // Update project in storage
-        ProjectControl projectControl = new ProjectControl();
-        projectControl.updateProject(project);
-        
-        return true;
-    }
+    // Other methods from the original class...
+
     
     /**
      * Generate a receipt for a booking

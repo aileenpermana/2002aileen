@@ -34,7 +34,7 @@ public class ApplicationControl {
         }
         
         // Check if applicant is eligible for this project
-        if (!project.checkEligibility(applicant)) {
+        if (!project.checkEligibility(applicant, project.getProjectID())) {
             return false;
         }
         
@@ -62,6 +62,39 @@ public class ApplicationControl {
     }
     
     /**
+ * Helper method to find or create an applicant by NRIC with actual user data
+ * This method should replace the existing findOrCreateApplicant method in ApplicationControl
+ * 
+ * @param nric the applicant's NRIC
+ * @return the applicant object with actual data
+ */
+private Applicant findOrCreateApplicant(String nric) {
+    // Try to find the actual applicant data using UserDataLookup
+    User user = UserDataLookup.findUserByNRIC(nric);
+    
+    if (user != null) {
+        // If found but not an Applicant, convert to Applicant
+        if (user instanceof Applicant) {
+            return (Applicant) user;
+        } else {
+            // Create a new Applicant with the actual user data
+            return new Applicant(
+                user.getName(),
+                user.getNRIC(),
+                user.getPassword(),
+                user.getAge(),
+                user.getMaritalStatus(),
+                "Applicant"
+            );
+        }
+    }
+    
+    // If not found, create a placeholder applicant
+    // Use the UserDataLookup utility for consistency
+    return (Applicant) UserDataLookup.createFallbackUser(nric, "Applicant");
+}
+
+    /**
      * Withdraw an application
      * @param application the application to withdraw
      * @return true if withdrawal request is successful, false otherwise
@@ -85,75 +118,70 @@ public class ApplicationControl {
         return saveWithdrawalRequests();
     }
     
-    /**
-     * Process a withdrawal request
-     * @param application the application
-     * @param approve true to approve, false to reject
-     * @return true if processing is successful, false otherwise
-     */
-    public boolean processWithdrawalRequest(Application application, boolean approve) {
-        // Find the request
-        Map<String, Object> request = null;
-        for (Map<String, Object> req : withdrawalRequests) {
-            Application reqApp = (Application) req.get("application");
-            if (reqApp.getApplicationID().equals(application.getApplicationID())) {
-                request = req;
-                break;
-            }
-        }
-        
-        if (request == null) {
-            return false; // Request not found
-        }
-        
-        if (approve) {
-            // Update application status
-            ApplicationStatus currentStatus = application.getStatus();
-            application.setStatus(ApplicationStatus.UNSUCCESSFUL);
-            
-            // If the application was successful or booked, increment available units
-            if (currentStatus == ApplicationStatus.SUCCESSFUL || currentStatus == ApplicationStatus.BOOKED) {
-                Project project = application.getProject();
-                
-                // If flat was booked, free it
-                if (currentStatus == ApplicationStatus.BOOKED) {
-                    Flat bookedFlat = application.getBookedFlat();
-                    if (bookedFlat != null) {
-                        FlatType flatType = bookedFlat.getType();
-                        bookedFlat.setBookedByApplication(null);
-                        application.setBookedFlat(null);
-                        application.getApplicant().setBookedFlat(null);
-                        
-                        // Increment available units
-                        project.incrementAvailableUnits(flatType);
-                    }
-                } else {
-                    // For successful applications without a booked flat, determine flat type
-                    FlatType flatType = determineEligibleFlatType(application);
-                    if (flatType != null) {
-                        project.incrementAvailableUnits(flatType);
-                    }
-                }
-                
-                // Update project
-                ProjectControl projectControl = new ProjectControl();
-                projectControl.updateProject(project);
-            }
-            
-            // Update request status
-            request.put("status", "APPROVED");
-            
-            // Save changes
-            saveApplications();
-            saveWithdrawalRequests();
-            
-            return true;
-        } else {
-            // Just update request status
-            request.put("status", "REJECTED");
-            return saveWithdrawalRequests();
+    // In ApplicationControl.java - processWithdrawalRequest method
+public boolean processWithdrawalRequest(Application application, boolean approve) {
+    // Find the request
+    Map<String, Object> request = null;
+    for (Map<String, Object> req : withdrawalRequests) {
+        Application reqApp = (Application) req.get("application");
+        if (reqApp.getApplicationID().equals(application.getApplicationID())) {
+            request = req;
+            break;
         }
     }
+    
+    if (request == null) {
+        return false; // Request not found
+    }
+    
+    if (approve) {
+        // Update application status
+        ApplicationStatus currentStatus = application.getStatus();
+        application.setStatus(ApplicationStatus.UNSUCCESSFUL);  // Set to UNSUCCESSFUL when approved
+        
+        // If the application was successful or booked, increment available units
+        if (currentStatus == ApplicationStatus.SUCCESSFUL || currentStatus == ApplicationStatus.BOOKED) {
+            Project project = application.getProject();
+            
+            // If flat was booked, free it
+            if (currentStatus == ApplicationStatus.BOOKED) {
+                Flat bookedFlat = application.getBookedFlat();
+                if (bookedFlat != null) {
+                    FlatType flatType = bookedFlat.getType();
+                    bookedFlat.setBookedByApplication(null);
+                    application.setBookedFlat(null);
+                    application.getApplicant().setBookedFlat(null);
+                    
+                    // Increment available units
+                    project.incrementAvailableUnits(flatType);
+                }
+            } else {
+                // For successful applications without a booked flat, determine flat type
+                FlatType flatType = determineEligibleFlatType(application);
+                if (flatType != null) {
+                    project.incrementAvailableUnits(flatType);
+                }
+            }
+            
+            // Update project
+            ProjectControl projectControl = new ProjectControl();
+            projectControl.updateProject(project);
+        }
+        
+        // Update request status
+        request.put("status", "APPROVED");
+        
+        // Save changes to CSV
+        saveApplications();  // Update the applications CSV
+        saveWithdrawalRequests();  // Update the withdrawal requests CSV
+        
+        return true;
+    } else {
+        // Just update request status
+        request.put("status", "REJECTED");
+        return saveWithdrawalRequests();
+    }
+}
     
     /**
      * Get all applications in the system
@@ -642,23 +670,7 @@ public class ApplicationControl {
         }
     }
     
-    /**
-     * Helper method to find or create an applicant by NRIC
-     * @param nric the applicant's NRIC
-     * @return the applicant object
-     */
-    private Applicant findOrCreateApplicant(String nric) {
-        // In a real system, this would check a database or repository
-        // For now, create a placeholder applicant
-        return new Applicant(
-            "Applicant", // Placeholder name
-            nric,
-            "password",
-            30, // Placeholder age
-            "Married", // Placeholder marital status
-            "Applicant"
-        );
-    }
+    
     
     /**
      * Helper method to find or create a project by ID

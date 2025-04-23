@@ -2,6 +2,9 @@ package boundary;
 
 import control.LoginControl;
 import control.RegistrationControl;
+import entity.Applicant;
+import entity.HDBManager;
+import entity.HDBOfficer;
 import entity.User;
 import java.util.Scanner;
 import utils.ScreenUtil; // Make sure to import User
@@ -108,6 +111,47 @@ public class LoginUI {
             System.out.println("\nRegistration failed. Please try again later. click ENTER to restart.");
             sc.nextLine();
             return true;
+        }
+    }
+
+        /**
+     * Switch user role while maintaining the same user
+     * @param user the current user
+     * @param newRole the role to switch to
+     * @return the user with the new role
+     */
+    public User switchUserRole(User user, String newRole) {
+        // Create a new user object based on the current user's details
+        switch (newRole.toLowerCase()) {
+            case "applicant":
+                return new Applicant(
+                    user.getName(), 
+                    user.getNRIC(), 
+                    user.getPassword(), 
+                    user.getAge(), 
+                    user.getMaritalStatus(), 
+                    "Applicant"
+                );
+            case "officer":
+                return new HDBOfficer(
+                    user.getName(), 
+                    user.getNRIC(), 
+                    user.getPassword(), 
+                    user.getAge(), 
+                    user.getMaritalStatus(), 
+                    "HDBOfficer"
+                );
+            case "manager":
+                return new HDBManager(
+                    user.getName(), 
+                    user.getNRIC(), 
+                    user.getPassword(), 
+                    user.getAge(), 
+                    user.getMaritalStatus(), 
+                    "HDBManager"
+                );
+            default:
+                return user; // Return original user if no matching role
         }
     }
     

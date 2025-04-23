@@ -1,5 +1,6 @@
 package entity;
 
+import control.HDBOfficerControl;
 import control.ProjectControl;
 import java.util.ArrayList;
 import java.util.Date;
@@ -107,15 +108,43 @@ public class HDBManager extends User {
     }
     
     /**
-     * Generate a project ID based on the project name
-     * @param projectName the name of the project
-     * @return a generated project ID
-     */
-    private String generateProjectID(String projectName) {
-        // Simple algorithm: first 3 characters of project name + timestamp
-        String prefix = projectName.substring(0, Math.min(3, projectName.length())).toUpperCase();
-        return prefix + System.currentTimeMillis() % 10000;
+ * Generate a project ID based on the project name
+ * @param projectName the name of the project
+ * @return a generated project ID
+ */
+private String generateProjectID(String projectName) {
+    // Create a more consistent ID format:
+    // First 3 chars of project name (uppercase) + sequential number (3 digits)
+    String prefix = projectName.substring(0, Math.min(3, projectName.length())).toUpperCase();
+    
+    // Get current projects to determine next sequence number
+    ProjectControl projectControl = new ProjectControl();
+    List<Project> allProjects = projectControl.getAllProjects();
+    
+    // Find the highest sequence number for projects with the same prefix
+    int maxSequence = 0;
+    for (Project project : allProjects) {
+        String id = project.getProjectID();
+        if (id.startsWith(prefix)) {
+            try {
+                // Extract the numeric part
+                String numericPart = id.substring(prefix.length());
+                int sequence = Integer.parseInt(numericPart);
+                if (sequence > maxSequence) {
+                    maxSequence = sequence;
+                }
+            } catch (NumberFormatException | IndexOutOfBoundsException e) {
+                // Ignore malformed IDs
+            }
+        }
     }
+    
+    // Next sequence number
+    int nextSequence = maxSequence + 1;
+    
+    // Format with leading zeros (e.g., 001, 002, etc.)
+    return prefix + String.format("%03d", nextSequence);
+}
     
     /**
      * Edit an existing project
@@ -210,40 +239,34 @@ public class HDBManager extends User {
     }
     
     /**
-     * Process an officer's registration for a project
-     * @param officer the officer
-     * @param project the project
-     * @param approve true to approve, false to reject
-     * @return true if operation was successful, false otherwise
-     */
-    public boolean processOfficerRegistration(HDBOfficer officer, Project project, boolean approve) {
-        // Check if manager is managing this project
-        if (!managingProjects.contains(project)) {
-            return false;
-        }
-        
-        // Check if there are available slots
-        if (approve && project.getAvailableOfficerSlots() <= 0) {
-            return false;
-        }
-        
-        if (approve) {
-            // Add officer to project
-            boolean success = project.addOfficer(officer);
-            if (success) {
-                officer.addHandlingProject(project);
-                
-                // Save changes via Project Control
-                ProjectControl projectControl = new ProjectControl();
-                projectControl.updateProject(project);
-                return true;
-            }
-        } else {
-            // For rejection, no changes needed to the project
-            return true;
-        }
-        
+ * Process an officer's registration for a project
+ * Fixed version with proper type handling to avoid casting errors
+ * 
+ * @param user the user registering as an officer (can be any User type)
+ * @param project the project
+ * @param approve true to approve, false to reject
+ * @return true if operation was successful, false otherwise
+ */
+public boolean processOfficerRegistration(User user, Project project, boolean approve) {
+    // Check if manager is managing this project
+    if (!managingProjects.contains(project)) {
         return false;
+    }
+    
+    // Check if there are available slots for approval
+    if (approve && project.getAvailableOfficerSlots() <= 0) {
+        return false;
+    }
+    
+    // Use HDBOfficerControl to handle the registration update
+    HDBOfficerControl officerControl = new HDBOfficerControl();
+    
+    // Process the registration - no type casting needed since officerControl handles User objects
+    return officerControl.processOfficerRegistration(user, project, approve);
+}
+
+    public void setManagingProjects(List<Project> managingProjects) {
+        this.managingProjects = managingProjects;
     }
     // In HDBManager.java, add this method:
 

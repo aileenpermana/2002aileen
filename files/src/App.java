@@ -2,6 +2,7 @@ import boundary.ApplicantUI;
 import boundary.LoginUI;
 import boundary.ManagerUI;
 import boundary.OfficerUI;
+import control.HDBOfficerControl;
 import entity.Applicant;
 import entity.HDBManager;
 import entity.HDBOfficer;
@@ -28,11 +29,9 @@ public class App {
             e.printStackTrace();
         }
     }
+
+        
     
-    /**
-     * Main method to start the application.
-     * @param args command line arguments
-     */
     public static void main(String[] args) {
         // Display welcome message
         ScreenUtil.clearScreen();
@@ -47,42 +46,100 @@ public class App {
         // Initialize application data
         initializeData();
         
-        // Initialize login UI
-        LoginUI loginUI = new LoginUI();
-        User currentUser = null;
+        boolean exitApplication = false;
         
-        // Login loop
-        while (currentUser == null) {
-            boolean shouldContinue = loginUI.displayLoginMenu();
-            if (!shouldContinue) {
-                currentUser = loginUI.getCurrentUser();
-                if (currentUser == null) {
-                    System.out.println("Login failed. Press Enter to try again or type 'exit' to quit.");
-                    Scanner sc = new Scanner(System.in);
-                    String input = sc.nextLine();
-                    if (input.equalsIgnoreCase("exit")) {
-                        break;
+        // Application loop - continues until user explicitly exits
+        while (!exitApplication) {
+            // Initialize login UI
+            LoginUI loginUI = new LoginUI();
+            User currentUser = null;
+            Object currentUI = null;
+    
+            // Login loop
+            while (currentUser == null) {
+                boolean shouldContinue = loginUI.displayLoginMenu();
+                if (!shouldContinue) {
+                    currentUser = loginUI.getCurrentUser();
+                    if (currentUser == null) {
+                        System.out.println("Login failed. Press Enter to try again or type 'exit' to quit.");
+                        Scanner sc = new Scanner(System.in);
+                        String input = sc.nextLine();
+                        if (input.equalsIgnoreCase("exit")) {
+                            exitApplication = true;
+                            break;
+                        }
+                    } else {
+                        // Determine initial UI based on user type
+                        if (currentUser instanceof HDBManager) {
+                            currentUI = new ManagerUI((HDBManager) currentUser);
+                        } else if (currentUser instanceof HDBOfficer) {
+                            currentUI = new OfficerUI((HDBOfficer) currentUser);
+                        } else if (currentUser instanceof Applicant) {
+                            currentUI = new ApplicantUI((Applicant) currentUser);
+                        }
                     }
                 }
             }
+            
+            // If user chose to exit from login, break out of the main loop
+            if (exitApplication) {
+                break;
+            }
+            
+            // Main application loop - runs until user signs out
+            boolean signedOut = false;
+            while (currentUI != null && !signedOut) {
+                if (currentUI instanceof ManagerUI) {
+                    signedOut = ((ManagerUI) currentUI).displayMenu();
+                } else if (currentUI instanceof OfficerUI) {
+                    signedOut = ((OfficerUI) currentUI).displayMenu();
+                    
+                    // Switch to Applicant UI if not signed out
+                    if (!signedOut && currentUser instanceof HDBOfficer) {
+                        Applicant applicant = new Applicant(
+                            currentUser.getName(), 
+                            currentUser.getNRIC(), 
+                            currentUser.getPassword(), 
+                            currentUser.getAge(), 
+                            currentUser.getMaritalStatus(), 
+                            "Applicant"
+                        );
+                        currentUser = applicant;
+                        currentUI = new ApplicantUI(applicant);
+                    }
+                } else if (currentUI instanceof ApplicantUI) {
+                    signedOut = ((ApplicantUI) currentUI).displayMenu();
+                    
+                    // Switch to Officer UI if the user is an officer and chose to switch
+                    if (!signedOut && currentUser instanceof Applicant) {
+                        HDBOfficerControl officerControl = new HDBOfficerControl();
+                        if (officerControl.isOfficer(currentUser.getNRIC())) {
+                            HDBOfficer officer = new HDBOfficer(
+                                currentUser.getName(), 
+                                currentUser.getNRIC(), 
+                                currentUser.getPassword(), 
+                                currentUser.getAge(), 
+                                currentUser.getMaritalStatus(), 
+                                "HDBOfficer"
+                            );
+                            currentUser = officer;
+                            currentUI = new OfficerUI(officer);
+                        }
+                    }
+                } else {
+                    signedOut = true;
+                }
+                
+                // If signed out, break UI loop to return to login
+                if (signedOut) {
+                    System.out.println("Signing out...");
+                    System.out.println("Press Enter to return to login screen...");
+                    Scanner sc = new Scanner(System.in);
+                    sc.nextLine();
+                    break;
+                }
+            }
         }
-        
-        // Route to appropriate UI based on user role
-        if (currentUser instanceof HDBManager) {
-            ManagerUI managerUI = new ManagerUI((HDBManager) currentUser);
-            managerUI.displayMenu();
-        } else if (currentUser instanceof HDBOfficer) {
-            OfficerUI officerUI = new OfficerUI((HDBOfficer) currentUser);
-            officerUI.displayMenu();
-        } else if (currentUser instanceof Applicant) {
-            ApplicantUI applicantUI = new ApplicantUI((Applicant) currentUser);
-            applicantUI.displayMenu();
-        } else {
-            System.out.println("Unknown user type. Please contact system administrator.");
-        }
-        
-        // Close resources
-        loginUI.close();
         
         // Display exit message
         ScreenUtil.clearScreen();
