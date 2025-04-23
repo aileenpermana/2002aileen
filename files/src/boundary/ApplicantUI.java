@@ -100,6 +100,9 @@ public void displayMenu() {
 }
     
     private void viewAvailableProjects() {
+    boolean exitToMain = false;
+    
+    while (!exitToMain) {
         ScreenUtil.clearScreen();
         System.out.println("\n===== Available Projects =====");
         
@@ -124,10 +127,13 @@ public void displayMenu() {
             return;
         }
         
-        // Show filtering options
-        displayFilterOptions(eligibleProjects);
+        // Always start with alphabetical sorting by default
+        // This ensures projects are displayed immediately in alphabetical order
+        if (!filterPreferences.containsKey("sortBy")) {
+            filterPreferences.put("sortBy", SORT_BY_ALPHABETICAL);
+        }
         
-        // Apply filters and sorting
+        // Apply current filters and sorting
         List<Project> filteredProjects = applyFiltersAndSort(eligibleProjects);
         
         if (filteredProjects.isEmpty()) {
@@ -143,46 +149,63 @@ public void displayMenu() {
         // Project selection submenu
         System.out.println("\nOptions:");
         System.out.println("1. View Project Details");
-        System.out.println("2. Return to Main Menu");
+        System.out.println("2. Filter and Sort Projects");
+        System.out.println("3. Return to Main Menu");
         
         System.out.print("\nEnter your choice: ");
         String choice = sc.nextLine();
         
-        if (choice.equals("1")) {
-            System.out.print("Enter project number to view details: ");
-            try {
-                int projectIndex = Integer.parseInt(sc.nextLine()) - 1;
-                if (projectIndex >= 0 && projectIndex < filteredProjects.size()) {
-                    viewProjectDetails(filteredProjects.get(projectIndex));
-                } else {
-                    System.out.println("Invalid project number. Press Enter to continue.");
+        switch (choice) {
+            case "1":
+                System.out.print("Enter project number to view details: ");
+                try {
+                    int projectIndex = Integer.parseInt(sc.nextLine()) - 1;
+                    if (projectIndex >= 0 && projectIndex < filteredProjects.size()) {
+                        viewProjectDetails(filteredProjects.get(projectIndex));
+                    } else {
+                        System.out.println("Invalid project number. Press Enter to continue.");
+                        sc.nextLine();
+                    }
+                } catch (NumberFormatException e) {
+                    System.out.println("Invalid input. Press Enter to continue.");
                     sc.nextLine();
                 }
-            } catch (NumberFormatException e) {
-                System.out.println("Invalid input. Press Enter to continue.");
+                break;
+            case "2":
+                // Show filtering options only when user selects this option
+                displayFilterOptions(eligibleProjects);
+                break;
+            case "3":
+                exitToMain = true;
+                break;
+            default:
+                System.out.println("Invalid choice. Press Enter to continue.");
                 sc.nextLine();
-            }
         }
     }
+}
     
-    private void displayFilterOptions(List<Project> eligibleProjects) {
-        System.out.println("\n----- Filter and Sort Options -----");
-        System.out.println("Sort by:");
-        System.out.println("1. Flat Type");
-        System.out.println("2. Neighborhood");
-        System.out.println("3. Price Range");
-        System.out.println("4. Closing Date (Earliest first)");
-        System.out.println("5. Alphabetical (Default)");
-        System.out.println("6. Availability (Descending)");
-        
-        System.out.print("\nEnter sort option (or press Enter to use previous/default): ");
-        String sortOption = sc.nextLine();
-        
-        if (!sortOption.trim().isEmpty()) {
-            filterPreferences.put("sortBy", sortOption);
-        }
-        
-        // Neighborhood filter - show available neighborhoods
+private void displayFilterOptions(List<Project> eligibleProjects) {
+    System.out.println("\n----- Filter and Sort Options -----");
+    System.out.println("Sort by:");
+    System.out.println("1. Flat Types");
+    System.out.println("2. Neighborhood");
+    System.out.println("3. Closing Date (Earliest first)");
+    System.out.println("4. Alphabetical (Default)");
+    System.out.println("5. Availability (Most units first)");
+    
+    System.out.print("\nEnter sort option (or press Enter to use previous/default): ");
+    String sortOption = sc.nextLine();
+    
+    if (!sortOption.trim().isEmpty()) {
+        filterPreferences.put("sortBy", sortOption);
+    }
+    
+    // Get the current sort method
+    String currentSortMethod = (String) filterPreferences.getOrDefault("sortBy", SORT_BY_ALPHABETICAL);
+    
+    // Neighborhood filtering for Neighborhood sort method
+    if (currentSortMethod.equals(SORT_BY_NEIGHBORHOOD)) {
         Set<String> availableNeighborhoods = new HashSet<>();
         for (Project p : eligibleProjects) {
             availableNeighborhoods.add(p.getNeighborhood());
@@ -216,8 +239,11 @@ public void displayMenu() {
         } else {
             filterPreferences.remove("neighborhood");
         }
-        
-        // Flat type filter - show available flat types
+    }
+    
+    // Flat type filtering for Flat Type and Availability sort methods
+    if (currentSortMethod.equals(SORT_BY_FLAT_TYPE) || 
+        currentSortMethod.equals(SORT_BY_AVAILABILITY)) {
         System.out.println("\nSelect Flat Type:");
         System.out.println("1. 2-Room");
         System.out.println("2. 3-Room");
@@ -244,6 +270,7 @@ public void displayMenu() {
             filterPreferences.remove("flatType");
         }
     }
+}
     
     // First, let's restore and update the applyFiltersAndSort method in ApplicantUI.java
 
@@ -254,61 +281,89 @@ public void displayMenu() {
         Date currentDate = new Date(); // Today's date
         filteredProjects.removeIf(p -> !p.isOpenForApplication());
         
-        // Apply neighborhood filter if specified
-        if (filterPreferences.containsKey("neighborhood")) {
-            String neighborhood = (String) filterPreferences.get("neighborhood");
-            if (neighborhood != null && !neighborhood.trim().isEmpty()) {
-                filteredProjects.removeIf(p -> !p.getNeighborhood().equalsIgnoreCase(neighborhood));
-            }
-        }
-        
-        // Apply flat type filter if specified
-        if (filterPreferences.containsKey("flatType")) {
-            String flatTypeStr = (String) filterPreferences.get("flatType");
-            FlatType type = null;
-            
-            if (flatTypeStr.equalsIgnoreCase("2-Room")) {
-                type = FlatType.TWO_ROOM;
-            } else if (flatTypeStr.equalsIgnoreCase("3-Room")) {
-                type = FlatType.THREE_ROOM;
-            }
-            
-            if (type != null) {
-                final FlatType finalType = type;
-                // Filter projects that have this flat type AND have available units
-                filteredProjects.removeIf(p -> !p.hasFlatType(finalType) || p.getAvailableUnitsByType(finalType) <= 0);
-            }
-        }
-        
         // Apply sorting
         String sortBy = (String) filterPreferences.getOrDefault("sortBy", SORT_BY_ALPHABETICAL);
         
         switch (sortBy) {
-            case SORT_BY_FLAT_TYPE:
-                // Sort by number of flat types
-                filteredProjects.sort(Comparator.comparing(p -> p.getFlatTypes().size()));
-                break;
             case SORT_BY_NEIGHBORHOOD:
+                // Apply neighborhood filter
+                if (filterPreferences.containsKey("neighborhood")) {
+                    String neighborhood = (String) filterPreferences.get("neighborhood");
+                    if (neighborhood != null && !neighborhood.trim().isEmpty()) {
+                        filteredProjects.removeIf(p -> !p.getNeighborhood().equalsIgnoreCase(neighborhood));
+                    }
+                }
+                // Sort by neighborhood
                 filteredProjects.sort(Comparator.comparing(Project::getNeighborhood));
                 break;
-            case SORT_BY_PRICE_RANGE:
-                // This would require price data, using project ID as placeholder
-                filteredProjects.sort(Comparator.comparing(Project::getProjectID));
-                break;
+            
             case SORT_BY_CLOSING_DATE:
                 // Sort by closing date (earliest first)
                 filteredProjects.sort(Comparator.comparing(Project::getApplicationCloseDate));
                 break;
+            
+            case SORT_BY_FLAT_TYPE:
             case SORT_BY_AVAILABILITY:
-                // Sort by total available units (descending)
-                filteredProjects.sort((p1, p2) -> {
-                    int p1Available = calculateTotalAvailableUnits(p1);
-                    int p2Available = calculateTotalAvailableUnits(p2);
-                    return Integer.compare(p2Available, p1Available); // Descending
-                });
+                // Apply flat type filter
+                if (filterPreferences.containsKey("flatType")) {
+                    String flatTypeStr = (String) filterPreferences.get("flatType");
+                    FlatType type = null;
+                    
+                    if (flatTypeStr.equalsIgnoreCase("2-Room")) {
+                        type = FlatType.TWO_ROOM;
+                    } else if (flatTypeStr.equalsIgnoreCase("3-Room")) {
+                        type = FlatType.THREE_ROOM;
+                    }
+                    
+                    if (type != null) {
+                        final FlatType finalType = type;
+                        // Filter projects that have this flat type AND have available units
+                        filteredProjects.removeIf(p -> !p.hasFlatType(finalType) || p.getAvailableUnitsByType(finalType) <= 0);
+                    }
+                }
+                
+                // Sort by total available units (descending) if SORT_BY_AVAILABILITY
+                if (sortBy.equals(SORT_BY_AVAILABILITY)) {
+                    filteredProjects.sort((p1, p2) -> {
+                        int p1Available = calculateTotalAvailableUnits(p1);
+                        int p2Available = calculateTotalAvailableUnits(p2);
+                        return Integer.compare(p2Available, p1Available); // Descending
+                    });
+                } else {
+                    // Sort by number of distinct flat types
+                    filteredProjects.sort(Comparator.comparing(p -> p.getFlatTypes().size()));
+                }
                 break;
+            
             case SORT_BY_ALPHABETICAL:
             default:
+                // Optionally apply neighborhood filter if set
+                if (filterPreferences.containsKey("neighborhood")) {
+                    String neighborhood = (String) filterPreferences.get("neighborhood");
+                    if (neighborhood != null && !neighborhood.trim().isEmpty()) {
+                        filteredProjects.removeIf(p -> !p.getNeighborhood().equalsIgnoreCase(neighborhood));
+                    }
+                }
+                
+                // Optionally apply flat type filter if set
+                if (filterPreferences.containsKey("flatType")) {
+                    String flatTypeStr = (String) filterPreferences.get("flatType");
+                    FlatType type = null;
+                    
+                    if (flatTypeStr.equalsIgnoreCase("2-Room")) {
+                        type = FlatType.TWO_ROOM;
+                    } else if (flatTypeStr.equalsIgnoreCase("3-Room")) {
+                        type = FlatType.THREE_ROOM;
+                    }
+                    
+                    if (type != null) {
+                        final FlatType finalType = type;
+                        // Filter projects that have this flat type AND have available units
+                        filteredProjects.removeIf(p -> !p.hasFlatType(finalType) || p.getAvailableUnitsByType(finalType) <= 0);
+                    }
+                }
+                
+                // Sort by project name
                 filteredProjects.sort(Comparator.comparing(Project::getProjectName));
                 break;
         }
@@ -353,22 +408,25 @@ public void displayMenu() {
                             totalAvailable);
         }
         
-        // Add flat type availability breakdown
-        System.out.println("\nFlat Type Availability:");
-        System.out.printf("%-5s %-20s %-20s %-20s\n", 
-                         "No.", "Project Name", "2-Room Available", "3-Room Available");
-        System.out.println("--------------------------------------------------------------------------");
-        
-        for (int i = 0; i < projects.size(); i++) {
-            Project p = projects.get(i);
-            int twoRoomAvailable = p.getAvailableUnitsByType(FlatType.TWO_ROOM);
-            int threeRoomAvailable = p.getAvailableUnitsByType(FlatType.THREE_ROOM);
+        // Only show flat type availability when sorting by flat type
+        String currentSortMethod = (String) filterPreferences.getOrDefault("sortBy", SORT_BY_ALPHABETICAL);
+        if (currentSortMethod.equals(SORT_BY_FLAT_TYPE)) {
+            System.out.println("\nFlat Type Availability:");
+            System.out.printf("%-5s %-20s %-20s %-20s\n", 
+                             "No.", "Project Name", "2-Room Available", "3-Room Available");
+            System.out.println("--------------------------------------------------------------------------");
             
-            System.out.printf("%-5d %-20s %-20d %-20d\n", 
-                            (i + 1),
-                            truncateString(p.getProjectName(), 20),
-                            twoRoomAvailable,
-                            threeRoomAvailable);
+            for (int i = 0; i < projects.size(); i++) {
+                Project p = projects.get(i);
+                int twoRoomAvailable = p.getAvailableUnitsByType(FlatType.TWO_ROOM);
+                int threeRoomAvailable = p.getAvailableUnitsByType(FlatType.THREE_ROOM);
+                
+                System.out.printf("%-5d %-20s %-20d %-20d\n", 
+                                (i + 1),
+                                truncateString(p.getProjectName(), 20),
+                                twoRoomAvailable,
+                                threeRoomAvailable);
+            }
         }
     }
 
