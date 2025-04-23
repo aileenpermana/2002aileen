@@ -260,7 +260,7 @@ public class WithdrawalControl {
         List<Map<String, Object>> loadedRequests = new ArrayList<>();
         
         try {
-            File file = new File(WITHDRAWALS_FILE);
+            File file = new File("files/resources/WithdrawalRequests.csv");
             
             // Create file if it doesn't exist
             if (!file.exists()) {
@@ -365,7 +365,7 @@ public class WithdrawalControl {
                 directory.mkdirs();
             }
             
-            try (PrintWriter writer = new PrintWriter(new FileWriter(WITHDRAWALS_FILE))) {
+            try (PrintWriter writer = new PrintWriter(new FileWriter("files/resources/WithdrawalRequests.csv"))) {
                 // Write header
                 writer.println("ApplicationID,Reason,RequestDate,IsProcessed,IsApproved,ProcessedDate,ProcessedBy");
                 

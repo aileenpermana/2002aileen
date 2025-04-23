@@ -182,7 +182,7 @@ public class HDBOfficerControl {
         List<Map<String, Object>> loadedRegistrations = new ArrayList<>();
         
         try {
-            File registrationsFile = new File(OFFICER_REGISTRATIONS_FILE);
+            File registrationsFile = new File("files/resources/OfficerRegistrations.csv");
             
             // If file doesn't exist, create it with header
             if (!registrationsFile.exists()) {
@@ -260,7 +260,7 @@ public class HDBOfficerControl {
                 directory.mkdirs();
             }
             
-            try (PrintWriter writer = new PrintWriter(new FileWriter(OFFICER_REGISTRATIONS_FILE))) {
+            try (PrintWriter writer = new PrintWriter(new FileWriter("files/resources/OfficerRegistrations.csv"))) {
                 // Write header
                 writer.println("OfficerNRIC,ProjectID,Status,RegistrationDate");
                 
