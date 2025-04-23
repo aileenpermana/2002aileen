@@ -1,8 +1,6 @@
-Project Name,Neighborhood,Type 1,Number of units for Type 1,Selling price for Type 1,Type 2,Number of units for Type 2,Selling price for Type 2,Application opening date,Application closing date,Manager,Officer Slot,Officer
-Acacia Breeze,Yishun,2-Room,2,0,3-Room,3,0,02/03/2026,03/08/2026,S5678901G,3,
-Sunrise Heights,Yishun,2-Room,100,0,3-Room,150,0,01/05/2024,01/08/2024,S1234567A,5,
-Garden View,Boon Lay,2-Room,80,0,3-Room,120,0,15/05/2024,15/08/2024,S1234567A,3,
-Skyline Residences,Tampines,2-Room,150,0,3-Room,200,0,01/06/2024,01/09/2024,T7654321B,6,
-Sunset Sunny,Bugis,2-Room,2000,0,3-Room,1000,0,08/11/2025,11/08/2026,T8765432F,10,
-Sunset,Bugis,2-Room,2000,0,3-Room,1000,0,01/01/2025,17/04/2025,T8765432F,10,
-
+ProjectID,Project Name,Neighborhood,Type 1,Number of units for Type 1,Selling price for Type 1,Type 2,Number of units for Type 2,Selling price for Type 2,Application opening date,Application closing date,Manager,Officer Slots,OfficerAcacia Breeze,Yishun,2-Room,2,0,3-Room,3,0,02/03/2026,03/08/2026,S5678901G,3,
+SUN001,Sunrise Heights,Yishun,2-Room,100,0,3-Room,150,0,01/05/2024,01/08/2024,S5678901G,5,
+GAR002,Garden View,Boon Lay,2-Room,80,0,3-Room,120,0,15/05/2024,15/08/2024,S5678901G,3,
+SKY003,Skyline Residences,Tampines,2-Room,150,0,3-Room,200,0,01/06/2024,01/09/2024,T8765432F,6,
+SSB004,Sunset Sunny,Bugis,2-Room,200,0,3-Room,100,0,08/11/2025,11/08/2026,T8765432F,10,
+ACA005,Acacia Breeze,Yishun,2-Room,20,0,3-Room,30,0,02/03/2026,03/08/2026,S5678901G,3,

@@ -107,15 +107,43 @@ public class HDBManager extends User {
     }
     
     /**
-     * Generate a project ID based on the project name
-     * @param projectName the name of the project
-     * @return a generated project ID
-     */
-    private String generateProjectID(String projectName) {
-        // Simple algorithm: first 3 characters of project name + timestamp
-        String prefix = projectName.substring(0, Math.min(3, projectName.length())).toUpperCase();
-        return prefix + System.currentTimeMillis() % 10000;
+ * Generate a project ID based on the project name
+ * @param projectName the name of the project
+ * @return a generated project ID
+ */
+private String generateProjectID(String projectName) {
+    // Create a more consistent ID format:
+    // First 3 chars of project name (uppercase) + sequential number (3 digits)
+    String prefix = projectName.substring(0, Math.min(3, projectName.length())).toUpperCase();
+    
+    // Get current projects to determine next sequence number
+    ProjectControl projectControl = new ProjectControl();
+    List<Project> allProjects = projectControl.getAllProjects();
+    
+    // Find the highest sequence number for projects with the same prefix
+    int maxSequence = 0;
+    for (Project project : allProjects) {
+        String id = project.getProjectID();
+        if (id.startsWith(prefix)) {
+            try {
+                // Extract the numeric part
+                String numericPart = id.substring(prefix.length());
+                int sequence = Integer.parseInt(numericPart);
+                if (sequence > maxSequence) {
+                    maxSequence = sequence;
+                }
+            } catch (NumberFormatException | IndexOutOfBoundsException e) {
+                // Ignore malformed IDs
+            }
+        }
     }
+    
+    // Next sequence number
+    int nextSequence = maxSequence + 1;
+    
+    // Format with leading zeros (e.g., 001, 002, etc.)
+    return prefix + String.format("%03d", nextSequence);
+}
     
     /**
      * Edit an existing project
