@@ -57,6 +57,11 @@ public class ApplicantUI {
 
  public boolean displayMenu() {
     boolean exit = false;
+    List<Application> myApplication = currentUser.getApplications();
+        if (myApplication == null || myApplication.isEmpty()) {
+            myApplication = applicationControl.getApplicationByUser(currentUser);
+            currentUser.setApplications(myApplication);
+        } 
     
     while (!exit) {
         ScreenUtil.clearScreen();

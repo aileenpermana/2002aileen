@@ -58,27 +58,8 @@ public class HDBManagerControl {
      * @param approvals map of application IDs to approval status
      * @return number of applications processed successfully
      */
-    public int processApplications(HDBManager manager, List<Application> applications, Map<String, Boolean> approvals) {
-        int processed = 0;
+    public boolean processApplication(HDBManager manager, Application app, boolean isApproved) {
         ApplicationControl applicationControl = new ApplicationControl();
-        
-        for (Application app : applications) {
-            // Check if manager is in charge of the project
-            if (!app.getProject().getManagerInCharge().getManagerID().equals(manager.getManagerID())) {
-                continue;
-            }
-            
-            // Check if application is pending
-            if (app.getStatus() != ApplicationStatus.PENDING) {
-                continue;
-            }
-            
-            // Get approval status
-            Boolean isApproved = approvals.get(app.getApplicationID());
-            if (isApproved == null) {
-                continue; // No decision for this application
-            }
-            
             if (isApproved) {
                 // Approve application
                 // Check if there are available units of the requested type
@@ -87,12 +68,6 @@ public class HDBManagerControl {
                 if (app.getProject().getAvailableUnitsByType(requestedType) > 0) {
                     app.setStatus(ApplicationStatus.SUCCESSFUL);
                     
-                    // Decrement available units
-                    Project project = app.getProject();
-                    project.decrementAvailableUnits(requestedType);
-                    
-                    // Update project
-                    projectControl.updateProject(project);
                 } else {
                     // Not enough units, reject instead
                     app.setStatus(ApplicationStatus.UNSUCCESSFUL);
@@ -102,13 +77,14 @@ public class HDBManagerControl {
                 app.setStatus(ApplicationStatus.UNSUCCESSFUL);
             }
             
-            // Update application
-            if (applicationControl.updateApplication(app)) {
-                processed++;
+            app.setStatusUpdateDate(new Date());
+            boolean success = applicationControl.updateApplication(app);
+            if (success) {
+                applicationControl.saveApplications();
             }
-        }
         
-        return processed;
+        
+        return true;
     }
     
     /**
@@ -136,23 +112,31 @@ public class HDBManagerControl {
             }
         }
     }
-    
-    /**
-     * Process a withdrawal request
-     * @param manager the manager processing the request
-     * @param application the application to withdraw
-     * @param approve true to approve, false to reject
-     * @return true if processing is successful, false otherwise
-     */
-    public boolean processWithdrawalRequest(HDBManager manager, Application application, boolean approve) {
-        // Check if manager is in charge of the project
-        if (!application.getProject().getManagerInCharge().getManagerID().equals(manager.getManagerID())) {
-            return false;
+
+    private FlatType determineEligibleFlatType(Application application) {
+        Applicant applicant = application.getApplicant();
+        Project project = application.getProject();
+        
+        if (applicant.getMaritalStatus() == MaritalStatus.SINGLE) {
+            // Singles can only apply for 2-Room
+            if (project.hasFlatType(FlatType.TWO_ROOM)) {
+                return FlatType.TWO_ROOM;
+            }
+        } else if (applicant.getMaritalStatus() == MaritalStatus.MARRIED) {
+            // For married couples, check which type they're applying for
+            // In a real system, this would be stored in the application
+            // For now, we'll assume they're applying for 3-Room if available
+            if (project.hasFlatType(FlatType.THREE_ROOM)) {
+                return FlatType.THREE_ROOM;
+            } else if (project.hasFlatType(FlatType.TWO_ROOM)) {
+                return FlatType.TWO_ROOM;
+            }
         }
         
-        // Process the withdrawal
-        return manager.processWithdrawalRequest(application, approve);
+        return null;
     }
+    
+    
     
     /**
      * Create a new project

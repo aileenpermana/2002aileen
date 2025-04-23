@@ -83,7 +83,7 @@ public class ManagerUI {
                     manageApplications(myProjects);
                     break;
                 case "5":
-                    manageWithdrawalRequests(myProjects);
+                    manageWithdrawalRequests();
                     break;
                 case "6":
                     viewAndReplyToEnquiries(myProjects);
@@ -1071,13 +1071,13 @@ private void manageOfficerRegistrations(List<Project> myProjects) {
                     
                     if (choice.equals("1")) {
                         // Approve application
-                        if (processApplication(selectedApp, true)) {
+                        if (managerControl.processApplication(currentUser, selectedApp, true)) {
                             // Remove from pending list
                             pendingApplications.remove(appIndex);
                         }
                     } else {
                         // Reject application
-                        if (processApplication(selectedApp, false)) {
+                        if (managerControl.processApplication(currentUser, selectedApp, false)) {
                             // Remove from pending list
                             pendingApplications.remove(appIndex);
                         }
@@ -1119,73 +1119,8 @@ private void manageOfficerRegistrations(List<Project> myProjects) {
         }
     }
     
-    /**
-     * Process an application (approve or reject)
-     * @param application the application to process
-     * @param approve true to approve, false to reject
-     * @return true if processed successfully, false otherwise
-     */
-    private boolean processApplication(Application application, boolean approve) {
-        Project project = application.getProject();
-        
-        if (approve) {
-            // Check if there are available units of the appropriate type
-            // In a real system, you would determine the flat type from the application
-            // For now, we'll use a placeholder
-            FlatType requestedType = FlatType.TWO_ROOM;
-            
-            // For a married couple, we need to determine which flat type they want
-            if (application.getApplicant().getMaritalStatus() == MaritalStatus.MARRIED) {
-                System.out.println("\nApplicant is eligible for both 2-Room and 3-Room flats.");
-                System.out.println("Determine which flat type they are applying for:");
-                System.out.println("1. 2-Room");
-                System.out.println("2. 3-Room");
-                
-                System.out.print("\nEnter choice: ");
-                String flatChoice = sc.nextLine();
-                
-                if (flatChoice.equals("2")) {
-                    requestedType = FlatType.THREE_ROOM;
-                }
-            }
-            
-            // Check if there are available units
-            if (project.getAvailableUnitsByType(requestedType) <= 0) {
-                System.out.println("No available " + requestedType.getDisplayValue() + 
-                                 " units. Cannot approve application.");
-                System.out.println("Press Enter to continue...");
-                sc.nextLine();
-                return false;
-            }
-            
-            // Approve the application
-            application.setStatus(ApplicationStatus.SUCCESSFUL);
-            
-            // Decrement available units
-            project.decrementAvailableUnits(requestedType);
-            
-            System.out.println("Application approved successfully!");
-            System.out.println("Applicant: " + application.getApplicant().getName());
-            System.out.println("New status: " + application.getStatus().getDisplayValue());
-            
-        } else {
-            // Reject the application
-            application.setStatus(ApplicationStatus.UNSUCCESSFUL);
-            
-            System.out.println("Application rejected successfully!");
-            System.out.println("Applicant: " + application.getApplicant().getName());
-            System.out.println("New status: " + application.getStatus().getDisplayValue());
-        }
-        
-        System.out.println("Press Enter to continue...");
-        sc.nextLine();
-        return true;
-    }
     
-    /**
-     * View details of a specific application
-     * @param application the application to view
-     */
+    
     private void viewApplicationDetails(Application application) {
         ScreenUtil.clearScreen();
         SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
@@ -1194,8 +1129,25 @@ private void manageOfficerRegistrations(List<Project> myProjects) {
         System.out.println("Application ID: " + application.getApplicationID());
         System.out.println("Project: " + application.getProject().getProjectName());
         System.out.println("Application Date: " + dateFormat.format(application.getApplicationDate()));
-        System.out.println("Status: " + application.getStatus().getDisplayValue());
-        System.out.println("Last Updated: " + dateFormat.format(application.getStatusUpdateDate()));
+        
+        // Handle the case where status is WITHDRAW
+        if (application.getStatus() == ApplicationStatus.WITHDRAW) {
+            System.out.println("Status: Withdrawal Requested");
+            System.out.println("Withdrawal Requested Date: " + dateFormat.format(application.getStatusUpdateDate()));
+        } else {
+            System.out.println("Status: " + application.getStatus().getDisplayValue());
+            System.out.println("Last Updated: " + dateFormat.format(application.getStatusUpdateDate()));
+        }
+        
+        // Show flat details if booked
+        if (application.getStatus() == ApplicationStatus.BOOKED) {
+            Flat bookedFlat = application.getBookedFlat();
+            if (bookedFlat != null) {
+                System.out.println("\nBooked Flat Details:");
+                System.out.println("Flat ID: " + bookedFlat.getFlatID());
+                System.out.println("Flat Type: " + bookedFlat.getType().getDisplayValue());
+            }
+        }
         
         System.out.println("\nApplicant Details:");
         Applicant applicant = application.getApplicant();
@@ -1204,35 +1156,34 @@ private void manageOfficerRegistrations(List<Project> myProjects) {
         System.out.println("Age: " + applicant.getAge());
         System.out.println("Marital Status: " + applicant.getMaritalStatusDisplayValue());
         
-        // Eligibility information
-        System.out.println("\nEligibility:");
-        if (applicant.getMaritalStatus() == MaritalStatus.SINGLE) {
-            if (applicant.getAge() >= 35) {
-                System.out.println("Single applicant, 35 years or older: Eligible for 2-Room only");
+        // Show additional info for withdrawal requests
+        if (application.getStatus() == ApplicationStatus.WITHDRAW) {
+            System.out.println("\nWithdrawal Information:");
+            
+            // Determine what the status was before withdrawal
+            String previousStatus = "Unknown";
+            if (application.getBookedFlat() != null) {
+                previousStatus = "Booked";
             } else {
-                System.out.println("Single applicant, under 35: Not eligible");
+                // Could be either Pending or Successful - use your business logic
+                previousStatus = "Pending or Successful";
             }
-        } else if (applicant.getMaritalStatus() == MaritalStatus.MARRIED) {
-            if (applicant.getAge() >= 21) {
-                System.out.println("Married applicant, 21 years or older: Eligible for 2-Room and 3-Room");
-            } else {
-                System.out.println("Married applicant, under 21: Not eligible");
-            }
+            
+            System.out.println("Previous Status: " + previousStatus);
+            System.out.println("Note: If approved, resources will be freed and the applicant can apply again.");
         }
         
         System.out.println("\nPress Enter to continue...");
         sc.nextLine();
     }
     
-    /**
-     * Manage withdrawal requests
-     */
-    private void manageWithdrawalRequests(List<Project> myProjects) {
+    private void manageWithdrawalRequests() {
         ScreenUtil.clearScreen();
         System.out.println("\n===== Manage Withdrawal Requests =====");
         
+        List<Project> managedProjects = currentUser.getManagedProjects();
         
-        if (myProjects.isEmpty()) {
+        if (managedProjects.isEmpty()) {
             System.out.println("You are not currently managing any projects.");
             System.out.println("Press Enter to continue...");
             sc.nextLine();
@@ -1241,8 +1192,8 @@ private void manageOfficerRegistrations(List<Project> myProjects) {
         
         // Display the list of managed projects
         System.out.println("Select a project to manage withdrawal requests:");
-        for (int i = 0; i < myProjects.size(); i++) {
-            System.out.println((i + 1) + ". " + myProjects.get(i).getProjectName());
+        for (int i = 0; i < managedProjects.size(); i++) {
+            System.out.println((i + 1) + ". " + managedProjects.get(i).getProjectName());
         }
         
         System.out.print("\nEnter project number (0 to cancel): ");
@@ -1253,7 +1204,7 @@ private void manageOfficerRegistrations(List<Project> myProjects) {
                 return;
             }
             
-            if (projectChoice < 1 || projectChoice > myProjects.size()) {
+            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
                 System.out.println("Invalid project number. Press Enter to continue.");
                 sc.nextLine();
                 return;
@@ -1264,9 +1215,9 @@ private void manageOfficerRegistrations(List<Project> myProjects) {
             return;
         }
         
-        Project selectedProject = myProjects.get(projectChoice - 1);
+        Project selectedProject = managedProjects.get(projectChoice - 1);
         
-        // Get withdrawal requests for the selected project
+        // Get withdrawal requests for the selected project - UPDATED FOR WITHDRAW STATUS
         List<Application> withdrawalRequests = applicationControl.getWithdrawalRequests(selectedProject);
         
         if (withdrawalRequests.isEmpty()) {
@@ -1281,8 +1232,8 @@ private void manageOfficerRegistrations(List<Project> myProjects) {
             ScreenUtil.clearScreen();
             System.out.println("\n===== Withdrawal Requests for " + selectedProject.getProjectName() + " =====");
             
-            System.out.printf("%-5s %-20s %-15s %-15s %-15s\n", 
-                            "No.", "Applicant Name", "Application Date", "Status", "Last Updated");
+            System.out.printf("%-5s %-20s %-20s %-15s %-15s\n", 
+                            "No.", "Applicant Name", "Original Status", "Application Date", "Withdrawal Date");
             System.out.println("-------------------------------------------------------------------------------");
             
             SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
@@ -1290,12 +1241,13 @@ private void manageOfficerRegistrations(List<Project> myProjects) {
             for (int i = 0; i < withdrawalRequests.size(); i++) {
                 Application app = withdrawalRequests.get(i);
                 
-                System.out.printf("%-5d %-20s %-15s %-15s %-15s\n", 
+                // Display information
+                System.out.printf("%-5d %-20s %-20s %-15s %-15s\n", 
                                 (i + 1),
                                 truncateString(app.getApplicant().getName(), 20),
+                                "Withdrawal Requested", // Use a clear label
                                 dateFormat.format(app.getApplicationDate()),
-                                app.getStatus().getDisplayValue(),
-                                dateFormat.format(app.getStatusUpdateDate()));
+                                dateFormat.format(app.getStatusUpdateDate())); // Withdrawal date
             }
             
             System.out.println("\nOptions:");
@@ -1344,21 +1296,26 @@ private void manageOfficerRegistrations(List<Project> myProjects) {
                         }
                     } else {
                         // Reject withdrawal
-                        // In a real system, this would update the request status
-                        System.out.println("Withdrawal rejected successfully!");
+                        boolean success = currentUser.processWithdrawalRequest(selectedReq, false);
                         
-                        // Remove from list
-                        withdrawalRequests.remove(reqIndex);
-                        
-                        if (withdrawalRequests.isEmpty()) {
-                            System.out.println("No more pending withdrawal requests.");
+                        if (success) {
+                            System.out.println("Withdrawal rejected successfully!");
+                            System.out.println("Application will revert to its previous state.");
+                            
+                            // Remove from list
+                            withdrawalRequests.remove(reqIndex);
+                            
+                            if (withdrawalRequests.isEmpty()) {
+                                System.out.println("No more pending withdrawal requests.");
+                                System.out.println("Press Enter to continue...");
+                                sc.nextLine();
+                                break;
+                            }
+                        } else {
+                            System.out.println("Failed to reject withdrawal.");
                             System.out.println("Press Enter to continue...");
                             sc.nextLine();
-                            break;
                         }
-                        
-                        System.out.println("Press Enter to continue...");
-                        sc.nextLine();
                     }
                     
                 } catch (NumberFormatException e) {

@@ -1,5 +1,6 @@
 package entity;
 
+import control.ApplicationControl;
 import control.HDBOfficerControl;
 import control.ProjectControl;
 import java.util.ArrayList;
@@ -294,33 +295,19 @@ public boolean processOfficerRegistration(User user, Project project, boolean ap
         }
         
         if (approve) {
-            // Check current status
-            ApplicationStatus currentStatus = application.getStatus();
-            
+            // Check current status            
             // Reset the application status to allow new applications
             application.setStatus(ApplicationStatus.UNSUCCESSFUL);
-            
-            // If the application was successful or booked, increment available units
-            if (currentStatus == ApplicationStatus.SUCCESSFUL || currentStatus == ApplicationStatus.BOOKED) {
-                // In a real system, you would determine the flat type from the application
-                FlatType flatType = FlatType.TWO_ROOM; // Placeholder
-                project.incrementAvailableUnits(flatType);
-                
-                // If flat was booked, free it
-                if (currentStatus == ApplicationStatus.BOOKED) {
-                    Flat bookedFlat = application.getBookedFlat();
-                    if (bookedFlat != null) {
-                        bookedFlat.setBookedByApplication(null);
-                        application.setBookedFlat(null);
-                    }
-                }
-                
-                // Save changes via Project Control
-                ProjectControl projectControl = new ProjectControl();
-                projectControl.updateProject(project);
+            application.setStatusUpdateDate(new Date());
+            ApplicationControl applicationControl = new ApplicationControl();
+            boolean success = applicationControl.updateApplication(application);
+            if (success) {
+                applicationControl.saveApplications();
             }
+            
+            return success;
+            }
+            return false;
         }
         
-        return true;
     }
-}
