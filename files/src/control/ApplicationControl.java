@@ -62,6 +62,39 @@ public class ApplicationControl {
     }
     
     /**
+ * Helper method to find or create an applicant by NRIC with actual user data
+ * This method should replace the existing findOrCreateApplicant method in ApplicationControl
+ * 
+ * @param nric the applicant's NRIC
+ * @return the applicant object with actual data
+ */
+private Applicant findOrCreateApplicant(String nric) {
+    // Try to find the actual applicant data using UserDataLookup
+    User user = UserDataLookup.findUserByNRIC(nric);
+    
+    if (user != null) {
+        // If found but not an Applicant, convert to Applicant
+        if (user instanceof Applicant) {
+            return (Applicant) user;
+        } else {
+            // Create a new Applicant with the actual user data
+            return new Applicant(
+                user.getName(),
+                user.getNRIC(),
+                user.getPassword(),
+                user.getAge(),
+                user.getMaritalStatus(),
+                "Applicant"
+            );
+        }
+    }
+    
+    // If not found, create a placeholder applicant
+    // Use the UserDataLookup utility for consistency
+    return (Applicant) UserDataLookup.createFallbackUser(nric, "Applicant");
+}
+
+    /**
      * Withdraw an application
      * @param application the application to withdraw
      * @return true if withdrawal request is successful, false otherwise
@@ -642,23 +675,7 @@ public class ApplicationControl {
         }
     }
     
-    /**
-     * Helper method to find or create an applicant by NRIC
-     * @param nric the applicant's NRIC
-     * @return the applicant object
-     */
-    private Applicant findOrCreateApplicant(String nric) {
-        // In a real system, this would check a database or repository
-        // For now, create a placeholder applicant
-        return new Applicant(
-            "Applicant", // Placeholder name
-            nric,
-            "password",
-            30, // Placeholder age
-            "Married", // Placeholder marital status
-            "Applicant"
-        );
-    }
+    
     
     /**
      * Helper method to find or create a project by ID

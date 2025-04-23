@@ -1,5 +1,6 @@
 package entity;
 
+import control.HDBOfficerControl;
 import control.ProjectControl;
 import java.util.ArrayList;
 import java.util.Date;
@@ -238,41 +239,32 @@ private String generateProjectID(String projectName) {
     }
     
     /**
-     * Process an officer's registration for a project
-     * @param officer the officer
-     * @param project the project
-     * @param approve true to approve, false to reject
-     * @return true if operation was successful, false otherwise
-     */
-    public boolean processOfficerRegistration(HDBOfficer officer, Project project, boolean approve) {
-        // Check if manager is managing this project
-        if (!managingProjects.contains(project)) {
-            return false;
-        }
-        
-        // Check if there are available slots
-        if (approve && project.getAvailableOfficerSlots() <= 0) {
-            return false;
-        }
-        
-        if (approve) {
-            // Add officer to project
-            boolean success = project.addOfficer(officer);
-            if (success) {
-                officer.addHandlingProject(project);
-                
-                // Save changes via Project Control
-                ProjectControl projectControl = new ProjectControl();
-                projectControl.updateProject(project);
-                return true;
-            }
-        } else {
-            // For rejection, no changes needed to the project
-            return true;
-        }
-        
+ * Process an officer's registration for a project
+ * Fixed version with proper type handling to avoid casting errors
+ * 
+ * @param user the user registering as an officer (can be any User type)
+ * @param project the project
+ * @param approve true to approve, false to reject
+ * @return true if operation was successful, false otherwise
+ */
+public boolean processOfficerRegistration(User user, Project project, boolean approve) {
+    // Check if manager is managing this project
+    if (!managingProjects.contains(project)) {
         return false;
     }
+    
+    // Check if there are available slots for approval
+    if (approve && project.getAvailableOfficerSlots() <= 0) {
+        return false;
+    }
+    
+    // Use HDBOfficerControl to handle the registration update
+    HDBOfficerControl officerControl = new HDBOfficerControl();
+    
+    // Process the registration - no type casting needed since officerControl handles User objects
+    return officerControl.processOfficerRegistration(user, project, approve);
+}
+
     public void setManagingProjects(List<Project> managingProjects) {
         this.managingProjects = managingProjects;
     }

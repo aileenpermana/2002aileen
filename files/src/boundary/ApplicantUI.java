@@ -911,7 +911,7 @@ private void deleteEnquiry(List<Enquiry> enquiries) {
                 "HDBOfficer"
             );
             
-            boolean success = officerControl.registerOfficer(tempOfficer, project);
+            boolean success = officerControl.registerOfficerCandidate(tempOfficer, project);
             
             if (success) {
                 System.out.println("Registration submitted successfully! Your registration is pending approval.");

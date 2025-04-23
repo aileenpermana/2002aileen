@@ -3,6 +3,7 @@ package boundary;
 import control.ApplicationControl;
 import control.EnquiryControl;
 import control.HDBManagerControl;
+import control.HDBOfficerControl;
 import control.ProjectControl;
 import control.ReportControl;
 import control.UserControl;
@@ -738,7 +739,7 @@ public class ManagerUI {
         if (!officers.isEmpty()) {
             for (int i = 0; i < officers.size(); i++) {
                 System.out.println((i + 1) + ". " + officers.get(i).getName() + 
-                                 " (" + officers.get(i).getOfficerID() + ")");
+                                 " (" + officers.get(i).getNRIC() + ")");
             }
         }
         
@@ -760,169 +761,209 @@ public class ManagerUI {
     }
     
     /**
-     * Manage officer registrations (view, approve, reject)
-     */
-    private void manageOfficerRegistrations(List<Project> myProjects) {
+ * Safely get and display the officer list for a project without casting errors
+ * This is a helper method to avoid ClassCastException
+ * 
+ * @param project the project to get officers for
+ * @return list of officer names and IDs
+ */
+private List<Map<String, String>> getSafeOfficerList(Project project) {
+    List<Map<String, String>> officerInfo = new ArrayList<>();
+    
+    try {
+        for (HDBOfficer officer : project.getOfficers()) {
+            Map<String, String> info = new HashMap<>();
+            info.put("name", officer.getName());
+            info.put("id", officer.getOfficerID());
+            info.put("nric", officer.getNRIC());
+            officerInfo.add(info);
+        }
+    } catch (Exception e) {
+        System.err.println("Error getting officer list: " + e.getMessage());
+    }
+    
+    return officerInfo;
+}
+
+/**
+ * Manage officer registrations (view, approve, reject)
+ * Fixed version with proper type handling to avoid ClassCastException
+ */
+private void manageOfficerRegistrations(List<Project> myProjects) {
+    ScreenUtil.clearScreen();
+    System.out.println("\n===== Manage Officer Registrations =====");
+    
+    // Get all projects managed by this manager
+    List<Project> managedProjects = currentUser.getManagedProjects();
+    
+    if (myProjects.isEmpty()) {
+        System.out.println("You are not currently managing any projects.");
+        System.out.println("Press Enter to continue...");
+        sc.nextLine();
+        return;
+    }
+    
+    // Display the list of managed projects
+    System.out.println("Select a project to manage officer registrations:");
+    for (int i = 0; i < managedProjects.size(); i++) {
+        Project p = managedProjects.get(i);
+        System.out.println((i + 1) + ". " + p.getProjectName() + 
+                         " (Slots: " + p.getAvailableOfficerSlots() + 
+                         " available out of " + 
+                         (p.getAvailableOfficerSlots() + p.getOfficers().size()) + ")");
+    }
+    
+    System.out.print("\nEnter project number (0 to cancel): ");
+    int projectChoice;
+    try {
+        projectChoice = Integer.parseInt(sc.nextLine());
+        if (projectChoice == 0) {
+            return;
+        }
+        
+        if (projectChoice < 1 || projectChoice > managedProjects.size()) {
+            System.out.println("Invalid project number. Press Enter to continue.");
+            sc.nextLine();
+            return;
+        }
+    } catch (NumberFormatException e) {
+        System.out.println("Invalid input. Press Enter to continue.");
+        sc.nextLine();
+        return;
+    }
+    
+    Project selectedProject = myProjects.get(projectChoice - 1);
+    
+    boolean menuLoop = true;
+    while (menuLoop) {
         ScreenUtil.clearScreen();
-        System.out.println("\n===== Manage Officer Registrations =====");
+        System.out.println("\n===== Officer Registrations for " + selectedProject.getProjectName() + " =====");
+        System.out.println("Available Slots: " + selectedProject.getAvailableOfficerSlots());
         
-        // Get all projects managed by this manager
-        List<Project> managedProjects = currentUser.getManagedProjects();
+        // Get approved officers information safely
+        List<Map<String, String>> approvedOfficerInfo = getSafeOfficerList(selectedProject);
         
-        if (myProjects.isEmpty()) {
-            System.out.println("You are not currently managing any projects.");
-            System.out.println("Press Enter to continue...");
-            sc.nextLine();
-            return;
-        }
+        // Get pending registrations
+        HDBOfficerControl officerControl = new HDBOfficerControl();
+        List<Map<String, Object>> pendingRegistrations = officerControl.getPendingRegistrationsForProject(selectedProject);
         
-        // Display the list of managed projects
-        System.out.println("Select a project to manage officer registrations:");
-        for (int i = 0; i < managedProjects.size(); i++) {
-            Project p = managedProjects.get(i);
-            System.out.println((i + 1) + ". " + p.getProjectName() + 
-                             " (Slots: " + p.getAvailableOfficerSlots() + 
-                             " available out of " + 
-                             (p.getAvailableOfficerSlots() + p.getOfficers().size()) + ")");
-        }
-        
-        System.out.print("\nEnter project number (0 to cancel): ");
-        int projectChoice;
-        try {
-            projectChoice = Integer.parseInt(sc.nextLine());
-            if (projectChoice == 0) {
-                return;
-            }
+        // Display approved officers
+        if (!approvedOfficerInfo.isEmpty()) {
+            System.out.println("\n----- Approved Officers -----");
+            System.out.printf("%-5s %-20s %-15s %-15s\n", 
+                           "No.", "Officer Name", "Officer ID", "NRIC");
+            System.out.println("------------------------------------------------------");
             
-            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
-                System.out.println("Invalid project number. Press Enter to continue.");
-                sc.nextLine();
-                return;
+            for (int i = 0; i < approvedOfficerInfo.size(); i++) {
+                Map<String, String> info = approvedOfficerInfo.get(i);
+                
+                System.out.printf("%-5d %-20s %-15s %-15s\n", 
+                               (i + 1),
+                               truncateString(info.get("name"), 20),
+                               info.get("id"),
+                               info.get("nric"));
             }
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Press Enter to continue.");
-            sc.nextLine();
-            return;
-        }
-        
-        Project selectedProject = myProjects.get(projectChoice - 1);
-        
-        // Get officer registrations for the selected project
-        List<Map<String, Object>> registrations = managerControl.getOfficerRegistrations(selectedProject);
-        
-        if (registrations.isEmpty()) {
-            System.out.println("\nNo pending officer registrations for this project.");
-            System.out.println("Press Enter to continue...");
-            sc.nextLine();
-            return;
+        } else {
+            System.out.println("\nNo approved officers for this project yet.");
         }
         
         // Display pending registrations
-        while (true) {
-            ScreenUtil.clearScreen();
-            System.out.println("\n===== Officer Registrations for " + selectedProject.getProjectName() + " =====");
-            System.out.println("Available Slots: " + selectedProject.getAvailableOfficerSlots());
-            
-            List<Map<String, Object>> pendingRegistrations = new ArrayList<>();
-            for (Map<String, Object> reg : registrations) {
-                if (reg.get("status") == RegistrationStatus.PENDING) {
-                    pendingRegistrations.add(reg);
-                }
-            }
-            
-            if (pendingRegistrations.isEmpty()) {
-                System.out.println("\nNo pending officer registrations for this project.");
-                System.out.println("Press Enter to continue...");
-                sc.nextLine();
-                return;
-            }
-            
+        if (!pendingRegistrations.isEmpty()) {
+            System.out.println("\n----- Pending Officer Registrations -----");
             System.out.printf("%-5s %-20s %-15s %-15s\n", 
-                            "No.", "Officer Name", "Officer ID", "Registration Date");
-            System.out.println("----------------------------------------------------------");
+                           "No.", "Applicant Name", "NRIC", "Registration Date");
+            System.out.println("------------------------------------------------------");
             
             SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
             
             for (int i = 0; i < pendingRegistrations.size(); i++) {
                 Map<String, Object> reg = pendingRegistrations.get(i);
-                HDBOfficer officer = (HDBOfficer) reg.get("officer");
+                User user = (User) reg.get("officer");
                 Date regDate = (Date) reg.get("date");
                 
                 System.out.printf("%-5d %-20s %-15s %-15s\n", 
-                                (i + 1),
-                                truncateString(officer.getName(), 20),
-                                officer.getOfficerID(),
-                                dateFormat.format(regDate));
+                               (i + 1),
+                               truncateString(user.getName(), 20),
+                               user.getNRIC(),
+                               dateFormat.format(regDate));
             }
-            
-            System.out.println("\nOptions:");
+        } else {
+            System.out.println("\nNo pending officer registrations.");
+        }
+        
+        // Menu options
+        System.out.println("\nOptions:");
+        if (!pendingRegistrations.isEmpty()) {
             System.out.println("1. Approve Registration");
             System.out.println("2. Reject Registration");
             System.out.println("3. Return to Main Menu");
-            
-            System.out.print("\nEnter your choice: ");
-            String choice = sc.nextLine();
-            
-            if (choice.equals("1") || choice.equals("2")) {
-                System.out.print("Enter registration number: ");
-                try {
-                    int regIndex = Integer.parseInt(sc.nextLine()) - 1;
-                    if (regIndex < 0 || regIndex >= pendingRegistrations.size()) {
-                        System.out.println("Invalid registration number. Press Enter to continue.");
+        } else {
+            System.out.println("1. Return to Main Menu");
+        }
+        
+        System.out.print("\nEnter your choice: ");
+        String choice = sc.nextLine();
+        
+        // Process menu choice
+        if (!pendingRegistrations.isEmpty() && (choice.equals("1") || choice.equals("2"))) {
+            System.out.print("Enter registration number: ");
+            try {
+                int regIndex = Integer.parseInt(sc.nextLine()) - 1;
+                if (regIndex < 0 || regIndex >= pendingRegistrations.size()) {
+                    System.out.println("Invalid registration number. Press Enter to continue.");
+                    sc.nextLine();
+                    continue;
+                }
+                
+                Map<String, Object> selectedReg = pendingRegistrations.get(regIndex);
+                User user = (User) selectedReg.get("officer");
+                
+                if (choice.equals("1")) {
+                    // Check if there are available slots
+                    if (selectedProject.getAvailableOfficerSlots() <= 0) {
+                        System.out.println("No available officer slots. Cannot approve registration.");
+                        System.out.println("Press Enter to continue...");
                         sc.nextLine();
                         continue;
                     }
                     
-                    Map<String, Object> selectedReg = pendingRegistrations.get(regIndex);
-                    HDBOfficer officer = (HDBOfficer) selectedReg.get("officer");
+                    // Approve registration
+                    boolean success = currentUser.processOfficerRegistration(user, selectedProject, true);
                     
-                    if (choice.equals("1")) {
-                        // Check if there are available slots
-                        if (selectedProject.getAvailableOfficerSlots() <= 0) {
-                            System.out.println("No available officer slots. Cannot approve registration.");
-                            System.out.println("Press Enter to continue...");
-                            sc.nextLine();
-                            continue;
-                        }
-                        
-                        // Approve registration
-                        boolean success = currentUser.processOfficerRegistration(officer, selectedProject, true);
-                        
-                        if (success) {
-                            System.out.println("Registration approved successfully!");
-                            // Update registration status
-                            selectedReg.put("status", RegistrationStatus.APPROVED);
-                        } else {
-                            System.out.println("Failed to approve registration.");
-                        }
+                    if (success) {
+                        System.out.println("Registration approved successfully!");
+                        System.out.println("The applicant is now an officer for this project.");
                     } else {
-                        // Reject registration
-                        boolean success = currentUser.processOfficerRegistration(officer, selectedProject, false);
-                        
-                        if (success) {
-                            System.out.println("Registration rejected successfully!");
-                            // Update registration status
-                            selectedReg.put("status", RegistrationStatus.REJECTED);
-                        } else {
-                            System.out.println("Failed to reject registration.");
-                        }
+                        System.out.println("Failed to approve registration.");
                     }
+                } else {
+                    // Reject registration
+                    boolean success = currentUser.processOfficerRegistration(user, selectedProject, false);
                     
-                    System.out.println("Press Enter to continue...");
-                    sc.nextLine();
-                    
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid input. Press Enter to continue.");
-                    sc.nextLine();
+                    if (success) {
+                        System.out.println("Registration rejected successfully!");
+                    } else {
+                        System.out.println("Failed to reject registration.");
+                    }
                 }
-            } else if (choice.equals("3")) {
-                break;
-            } else {
-                System.out.println("Invalid choice. Press Enter to continue.");
+                
+                System.out.println("Press Enter to continue...");
+                sc.nextLine();
+                
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid input. Press Enter to continue.");
                 sc.nextLine();
             }
+        } else if ((pendingRegistrations.isEmpty() && choice.equals("1")) || choice.equals("3")) {
+            menuLoop = false;
+        } else {
+            System.out.println("Invalid choice. Press Enter to continue.");
+            sc.nextLine();
         }
     }
+}
+
+
     
     /**
      * Manage applications (approve, reject)

@@ -17,7 +17,6 @@ public class HDBOfficer extends User {
      */
     public HDBOfficer(String name, String NRIC, String password, int age, MaritalStatus maritalStatus, String role) {
         super(name, NRIC, password, age, maritalStatus, role);
-        this.officerID = "HO" + NRIC.substring(1, 8);
         this.handlingProjects = new ArrayList<>();
     }
     
@@ -26,7 +25,6 @@ public class HDBOfficer extends User {
      */
     public HDBOfficer(String name, String NRIC, String password, int age, String maritalStatus, String role) {
         super(name, NRIC, password, age, maritalStatus, role);
-        this.officerID = "HO" + NRIC.substring(1, 8);
         this.handlingProjects = new ArrayList<>();
     }
     

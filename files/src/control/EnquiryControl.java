@@ -44,6 +44,150 @@ public class EnquiryControl {
         
         return projectEnquiries;
     }
+
+    /**
+ * Load enquiries from file with proper user data
+ * This method should replace the existing loadEnquiries method in EnquiryControl
+ * 
+ * @return list of enquiries with actual user data
+ */
+private List<Enquiry> loadEnquiries() {
+    List<Enquiry> loadedEnquiries = new ArrayList<>();
+    ProjectControl projectControl = new ProjectControl();
+    
+    try {
+        File file = new File(ENQUIRIES_FILE);
+        
+        // Create file if it doesn't exist
+        if (!file.exists()) {
+            File parentDir = file.getParentFile();
+            if (parentDir != null && !parentDir.exists()) {
+                parentDir.mkdirs();
+            }
+            
+            try (PrintWriter writer = new PrintWriter(new FileWriter(file))) {
+                writer.println("EnquiryID,ApplicantNRIC,ProjectID,SubmissionDate,Content,Replies");
+            }
+            return loadedEnquiries;
+        }
+        
+        try (Scanner fileScanner = new Scanner(file)) {
+            // Skip header if exists
+            if (fileScanner.hasNextLine()) {
+                fileScanner.nextLine();
+            }
+            
+            while (fileScanner.hasNextLine()) {
+                String line = fileScanner.nextLine().trim();
+                if (line.isEmpty()) continue;
+                
+                // Use a more robust parsing approach to handle commas in content
+                int firstComma = line.indexOf(',');
+                int secondComma = line.indexOf(',', firstComma + 1);
+                int thirdComma = line.indexOf(',', secondComma + 1);
+                int fourthComma = line.indexOf(',', thirdComma + 1);
+                
+                if (firstComma == -1 || secondComma == -1 || thirdComma == -1 || fourthComma == -1) {
+                    System.err.println("Invalid enquiry record format: " + line);
+                    continue;
+                }
+                
+                try {
+                    String enquiryID = line.substring(0, firstComma).trim();
+                    String applicantNRIC = line.substring(firstComma + 1, secondComma).trim();
+                    String projectID = line.substring(secondComma + 1, thirdComma).trim();
+                    String dateStr = line.substring(thirdComma + 1, fourthComma).trim();
+                    
+                    // Extract content - any remaining text until last comma or end of line
+                    String remainingText = line.substring(fourthComma + 1);
+                    String content;
+                    List<String> replies = new ArrayList<>();
+                    
+                    int lastComma = remainingText.lastIndexOf(',');
+                    if (lastComma != -1) {
+                        // Has replies
+                        content = remainingText.substring(0, lastComma).trim();
+                        String repliesStr = remainingText.substring(lastComma + 1).trim();
+                        
+                        if (!repliesStr.isEmpty()) {
+                            String[] repliesArr = repliesStr.split("\\|");
+                            for (String reply : repliesArr) {
+                                replies.add(reply.trim());
+                            }
+                        }
+                    } else {
+                        // No replies
+                        content = remainingText.trim();
+                    }
+                    
+                    // Parse date
+                    long submissionDate = Long.parseLong(dateStr);
+                    
+                    // Find projects - using ProjectControl
+                    List<Project> allProjects = projectControl.getAllProjects();
+                    Project matchingProject = null;
+                    
+                    for (Project project : allProjects) {
+                        if (project.getProjectID().equals(projectID)) {
+                            matchingProject = project;
+                            break;
+                        }
+                    }
+                    
+                    if (matchingProject == null) {
+                        System.err.println("Project not found for ID: " + projectID);
+                        continue;
+                    }
+                    
+                    // Find applicant using UserDataLookup for actual data
+                    Applicant applicant;
+                    User user = UserDataLookup.findUserByNRIC(applicantNRIC);
+                    
+                    if (user != null) {
+                        if (user instanceof Applicant) {
+                            applicant = (Applicant) user;
+                        } else {
+                            // Convert to Applicant if found but not an Applicant
+                            applicant = new Applicant(
+                                user.getName(),
+                                user.getNRIC(),
+                                user.getPassword(),
+                                user.getAge(),
+                                user.getMaritalStatus(),
+                                "Applicant"
+                            );
+                        }
+                    } else {
+                        // Create fallback applicant if not found
+                        applicant = (Applicant) UserDataLookup.createFallbackUser(applicantNRIC, "Applicant");
+                    }
+                    
+                    // Create enquiry
+                    Enquiry enquiry = new Enquiry();
+                    enquiry.setEnquiryID(enquiryID);
+                    enquiry.setApplicant(applicant);
+                    enquiry.setProject(matchingProject);
+                    enquiry.setContent(content);
+                    enquiry.setSubmissionDate(new Date(submissionDate));
+                    enquiry.setReplies(replies);
+                    
+                    // Add to list
+                    loadedEnquiries.add(enquiry);
+                    
+                } catch (Exception e) {
+                    System.err.println("Error parsing enquiry data: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        }
+    } catch (FileNotFoundException e) {
+        System.out.println("Enquiries file not found. Starting with empty list.");
+    } catch (IOException e) {
+        System.err.println("Error reading enquiries file: " + e.getMessage());
+    }
+    
+    return loadedEnquiries;
+}
     
     /**
      * Get enquiries submitted by an applicant
@@ -305,134 +449,7 @@ public class EnquiryControl {
         return "ENQ-" + nricPart + "-" + projectPart + "-" + timestampPart;
     }
     
-    /**
-     * Load enquiries from file
-     * @return list of enquiries
-     */
-    private List<Enquiry> loadEnquiries() {
-        List<Enquiry> loadedEnquiries = new ArrayList<>();
-        ProjectControl projectControl = new ProjectControl();
-        
-        try {
-            File file = new File(ENQUIRIES_FILE);
-            
-            // Create file if it doesn't exist
-            if (!file.exists()) {
-                File parentDir = file.getParentFile();
-                if (parentDir != null && !parentDir.exists()) {
-                    parentDir.mkdirs();
-                }
-                
-                try (PrintWriter writer = new PrintWriter(new FileWriter(file))) {
-                    writer.println("EnquiryID,ApplicantNRIC,ProjectID,SubmissionDate,Content,Replies");
-                }
-                return loadedEnquiries;
-            }
-            
-            try (Scanner fileScanner = new Scanner(file)) {
-                // Skip header if exists
-                if (fileScanner.hasNextLine()) {
-                    fileScanner.nextLine();
-                }
-                
-                while (fileScanner.hasNextLine()) {
-                    String line = fileScanner.nextLine().trim();
-                    if (line.isEmpty()) continue;
-                    
-                    // Use a more robust parsing approach to handle commas in content
-                    int firstComma = line.indexOf(',');
-                    int secondComma = line.indexOf(',', firstComma + 1);
-                    int thirdComma = line.indexOf(',', secondComma + 1);
-                    int fourthComma = line.indexOf(',', thirdComma + 1);
-                    
-                    if (firstComma == -1 || secondComma == -1 || thirdComma == -1 || fourthComma == -1) {
-                        System.err.println("Invalid enquiry record format: " + line);
-                        continue;
-                    }
-                    
-                    try {
-                        String enquiryID = line.substring(0, firstComma).trim();
-                        String applicantNRIC = line.substring(firstComma + 1, secondComma).trim();
-                        String projectID = line.substring(secondComma + 1, thirdComma).trim();
-                        String dateStr = line.substring(thirdComma + 1, fourthComma).trim();
-                        
-                        // Extract content - any remaining text until last comma or end of line
-                        String remainingText = line.substring(fourthComma + 1);
-                        String content;
-                        List<String> replies = new ArrayList<>();
-                        
-                        int lastComma = remainingText.lastIndexOf(',');
-                        if (lastComma != -1) {
-                            // Has replies
-                            content = remainingText.substring(0, lastComma).trim();
-                            String repliesStr = remainingText.substring(lastComma + 1).trim();
-                            
-                            if (!repliesStr.isEmpty()) {
-                                String[] repliesArr = repliesStr.split("\\|");
-                                for (String reply : repliesArr) {
-                                    replies.add(reply.trim());
-                                }
-                            }
-                        } else {
-                            // No replies
-                            content = remainingText.trim();
-                        }
-                        
-                        // Parse date
-                        long submissionDate = Long.parseLong(dateStr);
-                        
-                        // Find projects - using ProjectControl
-                        List<Project> allProjects = projectControl.getAllProjects();
-                        Project matchingProject = null;
-                        
-                        for (Project project : allProjects) {
-                            if (project.getProjectID().equals(projectID)) {
-                                matchingProject = project;
-                                break;
-                            }
-                        }
-                        
-                        if (matchingProject == null) {
-                            System.err.println("Project not found for ID: " + projectID);
-                            continue;
-                        }
-                        
-                        // Create applicant placeholder - in a real system this would come from a repository
-                        Applicant applicant = new Applicant(
-                            "Applicant " + applicantNRIC, 
-                            applicantNRIC,
-                            "password",
-                            30, // Placeholder age
-                            "Single", // Placeholder marital status
-                            "Applicant"
-                        );
-                        
-                        // Create enquiry
-                        Enquiry enquiry = new Enquiry();
-                        enquiry.setEnquiryID(enquiryID);
-                        enquiry.setApplicant(applicant);
-                        enquiry.setProject(matchingProject);
-                        enquiry.setContent(content);
-                        enquiry.setSubmissionDate(new Date(submissionDate));
-                        enquiry.setReplies(replies);
-                        
-                        // Add to list
-                        loadedEnquiries.add(enquiry);
-                        
-                    } catch (Exception e) {
-                        System.err.println("Error parsing enquiry data: " + e.getMessage());
-                        e.printStackTrace();
-                    }
-                }
-            }
-        } catch (FileNotFoundException e) {
-            System.out.println("Enquiries file not found. Starting with empty list.");
-        } catch (IOException e) {
-            System.err.println("Error reading enquiries file: " + e.getMessage());
-        }
-        
-        return loadedEnquiries;
-    }
+    
     
     /**
      * Save enquiries to file
