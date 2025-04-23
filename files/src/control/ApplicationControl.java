@@ -663,8 +663,8 @@ public class ApplicationControl {
     /**
      * Helper method to find or create a project by ID
      * @param projectID the project ID
-     * @return the project object
-     */
+     * @return the project object*/
+     
     private Project findOrCreateProject(String projectID) {
         // Get the project from project control if possible
         ProjectControl projectControl = new ProjectControl();

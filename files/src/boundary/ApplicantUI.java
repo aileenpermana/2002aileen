@@ -695,22 +695,6 @@ private void deleteEnquiry(List<Enquiry> enquiries) {
      * @param project the project to apply for
      */
     private void applyForProject(Project project) {
-        // Check if already has an active application
-        if (currentUser.hasActiveApplications()) {
-            System.out.println("You already have an active application. Cannot apply for multiple projects.");
-            System.out.println("Press Enter to continue...");
-            sc.nextLine();
-            return;
-        }
-        
-        // Check eligibility
-        if (!project.checkEligibility(currentUser)) {
-            System.out.println("You are not eligible for this project. Please check requirements.");
-            System.out.println("Press Enter to continue...");
-            sc.nextLine();
-            return;
-        }
-        
         // Confirm application
         System.out.print("Confirm application for " + project.getProjectName() + "? (Y/N): ");
         String confirm = sc.nextLine();

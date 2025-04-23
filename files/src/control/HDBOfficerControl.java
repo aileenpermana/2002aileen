@@ -94,23 +94,27 @@ public class HDBOfficerControl {
             
             if (regOfficer.getNRIC().equals(officer.getNRIC()) && 
                 regProject.getProjectID().equals(project.getProjectID())) {
+                System.out.println("You are already an officer for this project.");
                 return false; // Already registered
             }
         }
         
         // Check if project has available slots
         if (project.getAvailableOfficerSlots() <= 0) {
+            System.out.println("No available slots for this project.");
             return false;
         }
         
         // Check if officer is handling another project in the same period
         if (officer.isHandlingProject(project.getApplicationOpenDate(), project.getApplicationCloseDate())) {
+            System.out.println("You are already handling another project in the same period.");
             return false;
         }
         
         // Check if officer has applied for this project as an applicant
         ApplicationControl appControl = new ApplicationControl();
         if (appControl.hasApplicationForProject(officer.getNRIC(), project)) {
+            System.out.println("You cannot be both an applicant and an officer for the same project.");
             return false; // Cannot be both applicant and officer for same project
         }
         
@@ -182,7 +186,7 @@ public class HDBOfficerControl {
         List<Map<String, Object>> loadedRegistrations = new ArrayList<>();
         
         try {
-            File registrationsFile = new File(OFFICER_REGISTRATIONS_FILE);
+            File registrationsFile = new File("files/resources/OfficerRegistrations.csv");
             
             // If file doesn't exist, create it with header
             if (!registrationsFile.exists()) {
@@ -260,7 +264,7 @@ public class HDBOfficerControl {
                 directory.mkdirs();
             }
             
-            try (PrintWriter writer = new PrintWriter(new FileWriter(OFFICER_REGISTRATIONS_FILE))) {
+            try (PrintWriter writer = new PrintWriter(new FileWriter("files/resources/OfficerRegistrations.csv"))) {
                 // Write header
                 writer.println("OfficerNRIC,ProjectID,Status,RegistrationDate");
                 
