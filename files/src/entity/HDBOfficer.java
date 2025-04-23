@@ -98,6 +98,10 @@ public class HDBOfficer extends User {
         return new ArrayList<>(handlingProjects);
     }
     
+    public void setHandlingProjects(List<Project> handlingProjects) {
+        this.handlingProjects = handlingProjects;
+    }
+    
     /**
      * Check if officer is handling a specific project
      * @param project the project to check

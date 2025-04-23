@@ -74,6 +74,21 @@ public class HDBOfficerControl {
         return registrations;
     }
     
+    // Add this method to HDBOfficerControl to sync officer projects on startup
+public void syncOfficerProjects() {
+    // Loop through officer registrations
+    for (Map<String, Object> reg : officerRegistrations) {
+        HDBOfficer officer = (HDBOfficer) reg.get("officer");
+        Project project = (Project) reg.get("project");
+        RegistrationStatus status = (RegistrationStatus) reg.get("status");
+        
+        // If registration is approved, ensure the officer is handling the project
+        if (status == RegistrationStatus.APPROVED) {
+            officer.addHandlingProject(project);
+            project.addOfficer(officer);
+        }
+    }
+}
     /**
  * Get all approved officers for a project
  * @param project the project
