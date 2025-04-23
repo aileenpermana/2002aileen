@@ -1,10 +1,6 @@
 package control;
 
 import entity.*;
-import java.io.File;
-import java.io.IOException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import utils.ProjectFileManager;
 
@@ -40,145 +36,13 @@ public class ProjectControl {
         List<Project> eligibleProjects = new ArrayList<>();
         
         for (Project project : allProjects) {
-            if (project.isVisible() && project.checkEligibility(user)) {
+            if (project.isVisible() && project.checkEligibility(user,project.getProjectID())) {
                 eligibleProjects.add(project);
             }
         }
         
         return eligibleProjects;
     }
-
-    /**
- * Find or create a project by ID with proper manager data lookup
- * This method should be added to the ProjectControl class
- * 
- * @param projectID the project ID
- * @return the project object with actual manager data
- */
-private Project findOrCreateProject(String projectID) {
-    // First try to find the project in existing projects
-    List<Project> allProjects = getAllProjects();
-    
-    for (Project p : allProjects) {
-        if (p.getProjectID().equals(projectID)) {
-            return p;
-        }
-    }
-    
-    // If not found, try to retrieve details from the project file
-    try (Scanner scanner = new Scanner(new File("files/resources/ProjectList.csv"))) {
-        // Skip header
-        if (scanner.hasNextLine()) {
-            scanner.nextLine();
-        }
-        
-        while (scanner.hasNextLine()) {
-            String line = scanner.nextLine().trim();
-            if (line.isEmpty()) continue;
-            
-            String[] values = line.split(",");
-            if (values.length < 12) continue;
-            
-            String projID = values[0].trim();
-            if (projID.equals(projectID)) {
-                // Found the project, now get proper details
-                String projectName = values[1].trim();
-                String neighborhood = values[2].trim();
-                String managerNRIC = values[11].trim();
-                
-                // Parse flat types and units
-                Map<FlatType, Integer> totalUnits = new HashMap<>();
-                
-                if (values[3].contains("2-Room") && !values[4].isEmpty()) {
-                    try {
-                        totalUnits.put(FlatType.TWO_ROOM, Integer.parseInt(values[4]));
-                    } catch (NumberFormatException e) {
-                        System.err.println("Error parsing 2-Room units for project " + projectID);
-                    }
-                }
-                
-                if (values[6].contains("3-Room") && !values[7].isEmpty()) {
-                    try {
-                        totalUnits.put(FlatType.THREE_ROOM, Integer.parseInt(values[7]));
-                    } catch (NumberFormatException e) {
-                        System.err.println("Error parsing 3-Room units for project " + projectID);
-                    }
-                }
-                
-                // Parse dates
-                Date openDate, closeDate;
-                try {
-                    SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
-                    openDate = dateFormat.parse(values[9]);
-                    closeDate = dateFormat.parse(values[10]);
-                } catch (ParseException e) {
-                    // Use current dates as fallback
-                    System.err.println("Error parsing dates for project " + projectID);
-                    openDate = new Date();
-                    closeDate = new Date();
-                }
-                
-                // Get manager with actual data
-                HDBManager manager;
-                User foundUser = UserDataLookup.findUserByNRICAndType(managerNRIC, "HDBManager");
-                
-                if (foundUser != null && foundUser instanceof HDBManager) {
-                    manager = (HDBManager) foundUser;
-                } else {
-                    manager = (HDBManager) UserDataLookup.createFallbackUser(managerNRIC, "HDBManager");
-                }
-                
-                // Parse officer slots
-                int officerSlots = 5; // Default
-                try {
-                    if (values.length > 12) {
-                        officerSlots = Integer.parseInt(values[12]);
-                    }
-                } catch (NumberFormatException e) {
-                    System.err.println("Error parsing officer slots for project " + projectID);
-                }
-                
-                // Create the project with actual data
-                Project project = new Project(
-                    projectID,
-                    projectName,
-                    neighborhood,
-                    totalUnits,
-                    openDate,
-                    closeDate,
-                    manager,
-                    officerSlots
-                );
-                
-                // Set visibility (default to true)
-                project.setVisible(true);
-                
-                return project;
-            }
-        }
-    } catch (IOException e) {
-        System.err.println("Error reading ProjectList.csv: " + e.getMessage());
-    }
-    
-    // If still not found, create a placeholder project
-    Map<FlatType, Integer> defaultUnits = new HashMap<>();
-    defaultUnits.put(FlatType.TWO_ROOM, 10);
-    defaultUnits.put(FlatType.THREE_ROOM, 10);
-    
-    // Create with a placeholder manager using UserDataLookup to ensure consistent approach
-    HDBManager placeholderManager = (HDBManager) UserDataLookup.createFallbackUser("S0000000A", "HDBManager");
-    
-    return new Project(
-        projectID,
-        "Project " + projectID, // Placeholder name
-        "Unknown Neighborhood", // Placeholder neighborhood
-        defaultUnits,
-        new Date(), // Current date for open date
-        new Date(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000), // 30 days later for close date
-        placeholderManager,
-        5 // Default officer slots
-    );
-}
     
     /**
      * Get visible projects for a user
@@ -207,7 +71,7 @@ private Project findOrCreateProject(String projectID) {
             }
             
             // For all users, check visibility and eligibility
-            if (project.isVisible() && project.checkEligibility(user)) {
+            if (project.isVisible() && project.checkEligibility(user, project.getProjectID())) {
                 visibleProjects.add(project);
             }
         }
@@ -262,6 +126,28 @@ private Project findOrCreateProject(String projectID) {
         }
         
         return managerProjects;
+    }
+
+        /**
+     * Get projects handled by a specific officer
+     * @param officer the HDB officer
+     * @return list of projects the officer is handling
+     */
+    public List<Project> getProjectsByOfficer(HDBOfficer officer) {
+        List<Project> allProjects = getAllProjects();
+        List<Project> officerProjects = new ArrayList<>();
+        
+        for (Project project : allProjects) {
+            // Use the existing officers list to check if the officer is handling the project
+            for (HDBOfficer projectOfficer : project.getOfficers()) {
+                if (projectOfficer.getNRIC().equalsIgnoreCase(officer.getNRIC())) {
+                    officerProjects.add(project);
+                    break;
+                }
+            }
+        }
+        
+        return officerProjects;
     }
 
     

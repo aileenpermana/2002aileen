@@ -2,6 +2,7 @@ import boundary.ApplicantUI;
 import boundary.LoginUI;
 import boundary.ManagerUI;
 import boundary.OfficerUI;
+import control.HDBOfficerControl;
 import entity.Applicant;
 import entity.HDBManager;
 import entity.HDBOfficer;
@@ -28,6 +29,8 @@ public class App {
             e.printStackTrace();
         }
     }
+
+        
     
     /**
      * Main method to start the application.
@@ -50,7 +53,8 @@ public class App {
         // Initialize login UI
         LoginUI loginUI = new LoginUI();
         User currentUser = null;
-        
+        Object currentUI = null;
+
         // Login loop
         while (currentUser == null) {
             boolean shouldContinue = loginUI.displayLoginMenu();
@@ -63,23 +67,63 @@ public class App {
                     if (input.equalsIgnoreCase("exit")) {
                         break;
                     }
+                } else {
+                    // Determine initial UI based on user type
+                    if (currentUser instanceof HDBManager) {
+                        currentUI = new ManagerUI((HDBManager) currentUser);
+                    } else if (currentUser instanceof HDBOfficer) {
+                        currentUI = new OfficerUI((HDBOfficer) currentUser);
+                    } else if (currentUser instanceof Applicant) {
+                        currentUI = new ApplicantUI((Applicant) currentUser);
+                    }
                 }
             }
         }
         
-        // Route to appropriate UI based on user role
-        if (currentUser instanceof HDBManager) {
-            ManagerUI managerUI = new ManagerUI((HDBManager) currentUser);
-            managerUI.displayMenu();
-        } else if (currentUser instanceof HDBOfficer) {
-            OfficerUI officerUI = new OfficerUI((HDBOfficer) currentUser);
-            officerUI.displayMenu();
-        } else if (currentUser instanceof Applicant) {
-            ApplicantUI applicantUI = new ApplicantUI((Applicant) currentUser);
-            applicantUI.displayMenu();
+        // Main application loop
+    while (currentUI != null) {
+        if (currentUI instanceof ManagerUI) {
+            ((ManagerUI) currentUI).displayMenu();
+        } else if (currentUI instanceof OfficerUI) {
+            ((OfficerUI) currentUI).displayMenu();
+            
+            // Switch to Applicant UI
+            if (currentUser instanceof HDBOfficer) {
+                Applicant applicant = new Applicant(
+                    currentUser.getName(), 
+                    currentUser.getNRIC(), 
+                    currentUser.getPassword(), 
+                    currentUser.getAge(), 
+                    currentUser.getMaritalStatus(), 
+                    "Applicant"
+                );
+                currentUser = applicant;
+                currentUI = new ApplicantUI(applicant);
+            }
+        } else if (currentUI instanceof ApplicantUI) {
+            ((ApplicantUI) currentUI).displayMenu();
+            
+            // Switch to Officer UI if the user is an officer and chose to switch
+            if (currentUser instanceof Applicant) {
+                HDBOfficerControl officerControl = new HDBOfficerControl();
+                if (officerControl.isOfficer(currentUser.getNRIC())) {
+                    HDBOfficer officer = new HDBOfficer(
+                        currentUser.getName(), 
+                        currentUser.getNRIC(), 
+                        currentUser.getPassword(), 
+                        currentUser.getAge(), 
+                        currentUser.getMaritalStatus(), 
+                        "HDBOfficer"
+                    );
+                    currentUser = officer;
+                    currentUI = new OfficerUI(officer);
+                }
+            }
         } else {
-            System.out.println("Unknown user type. Please contact system administrator.");
+            break;
         }
+    }
+
         
         // Close resources
         loginUI.close();

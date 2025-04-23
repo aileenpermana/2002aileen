@@ -74,6 +74,53 @@ public class ProjectFileManager {
         List<Project> projects = readAllProjects();
         System.out.println("Loaded " + projects.size() + " projects from file.");
     }
+
+        /**
+     * Find or create an officer by NRIC
+     * @param nric the officer's NRIC
+     * @return HDBOfficer object
+     */
+    private HDBOfficer findOrCreateOfficer(String nric) {
+        try (Scanner scanner = new Scanner(new File("files/resources/OfficerList.csv"))) {
+            // Skip header
+            if (scanner.hasNextLine()) {
+                scanner.nextLine();
+            }
+            
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine().trim();
+                if (line.isEmpty()) continue;
+                
+                String[] fields = line.split(",");
+                if (fields.length < 5) continue;
+                
+                String officerNRIC = fields[1].trim();
+                if (officerNRIC.equalsIgnoreCase(nric)) {
+                    // Create and return the real officer
+                    return new HDBOfficer(
+                        fields[0].trim(), // name
+                        officerNRIC,
+                        fields[4].trim(), // password
+                        Integer.parseInt(fields[2].trim()), // age
+                        fields[3].trim(), // marital status
+                        "HDBOfficer"
+                    );
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error finding officer: " + e.getMessage());
+        }
+        
+        // If not found, create a placeholder
+        return new HDBOfficer(
+            "Officer", 
+            nric, 
+            "password", 
+            30, // placeholder age
+            "Single", // placeholder marital status
+            "HDBOfficer"
+        );
+    }
     
     /**
      * Get the singleton instance
@@ -196,6 +243,9 @@ public class ProjectFileManager {
                 System.out.println("Invalid number format for officer slots: " + fields[12]);
                 officerSlots = 5; // Default value
             }
+
+            // Parse officer NRICs (last column)
+
             
             // Use the provided project ID instead of generating a new one
             Project project = new Project(
@@ -209,6 +259,14 @@ public class ProjectFileManager {
                 officerSlots
             );
             
+            if (fields.length > 13 && !fields[13].trim().isEmpty()) {
+                String[] officerNRICs = fields[13].trim().split(";");
+                for (String nric : officerNRICs) {
+                    HDBOfficer officer = findOrCreateOfficer(nric.trim());
+                    project.addOfficer(officer);
+                }
+            }
+
             // Set project visibility (default true)
             project.setVisible(true);
             
@@ -322,8 +380,12 @@ public class ProjectFileManager {
         // Officer Slots
         sb.append(project.getAvailableOfficerSlots()).append(",");
         
-        // Officers - placeholder for now
-        sb.append("");
+        // Officers 
+        List<String> officerNRICs = new ArrayList<>();
+        for (HDBOfficer officer : project.getOfficers()) {
+            officerNRICs.add(officer.getNRIC());
+        }
+        sb.append(String.join(";", officerNRICs));
         
         return sb.toString();
     }

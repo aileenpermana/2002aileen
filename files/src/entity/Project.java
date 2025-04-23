@@ -1,5 +1,6 @@
 package entity;
 
+import control.HDBOfficerControl;
 import java.util.*;
 
 /**
@@ -359,34 +360,59 @@ public class Project {
      * @param user the user to check
      * @return true if eligible, false otherwise
      */
-    public boolean checkEligibility(User user) {
-        // HDB Managers are not eligible for any project
-        if (user instanceof HDBManager) {
+    public boolean checkEligibility(User user, String projectID) {
+        // Check if the project is open for application
+        if (!isOpenForApplication()) {
             return false;
         }
         
-        // HDB Officers who are handling this project cannot apply
-        if (user instanceof HDBOfficer) {
-            HDBOfficer officer = (HDBOfficer) user;
-            if (officer.isHandlingProject(this)) {
-                return false;
+        
+        
+        // Check if the user is an applicant
+        if (!(user instanceof Applicant)) {
+            return false; // Only applicants can apply
+        }
+    
+        HDBOfficerControl officerControl = new HDBOfficerControl();
+        List<Map<String, Object>> officerRegistrations = officerControl.getOfficerRegistrations(
+                new HDBOfficer(
+                    user.getName(),
+                    user.getNRIC(),
+                    user.getPassword(),
+                    user.getAge(),
+                    user.getMaritalStatus(),
+                    "HDBOfficer"
+                )
+            );
+            if (!officerRegistrations.isEmpty()) {
+                System.out.println("\nOfficer Registration Status:");
+                for (Map<String, Object> reg : officerRegistrations) {
+                    Project project = (Project) reg.get("project");
+                    RegistrationStatus status = (RegistrationStatus) reg.get("status");
+                    if (status == RegistrationStatus.APPROVED){
+                        if (project.getProjectID() == projectID) {
+                            System.out.println("You are already registered as officer for this project.");
+                            return false; // Already registered for this project
+                        }
+                    }
+                }
             }
-        }
-        
-        // Check age and marital status
-        int age = user.getAge();
-        MaritalStatus maritalStatus = user.getMaritalStatus();
-        
-        if (maritalStatus == MaritalStatus.SINGLE) {
-            // Singles must be 35 years or older and project must have 2-Room units
-            return age >= 35 && totalUnits.containsKey(FlatType.TWO_ROOM);
-        } else if (maritalStatus == MaritalStatus.MARRIED) {
-            // Married couples must be 21 years or older
-            return age >= 21;
-        }
-        
-        return false;
+    
+    
+    // Check age and marital status
+    int age = user.getAge();
+    MaritalStatus maritalStatus = user.getMaritalStatus();
+    
+    if (maritalStatus == MaritalStatus.SINGLE) {
+        // Singles must be 35 years or older and project must have 2-Room units
+        return age >= 35 && totalUnits.containsKey(FlatType.TWO_ROOM);
+    } else if (maritalStatus == MaritalStatus.MARRIED) {
+        // Married couples must be 21 years or older
+        return age >= 21;
     }
+    
+    return false;
+}
     
     @Override
     public boolean equals(Object obj) {

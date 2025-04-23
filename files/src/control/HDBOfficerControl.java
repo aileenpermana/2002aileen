@@ -73,54 +73,92 @@ public class HDBOfficerControl {
         
         return registrations;
     }
-    
-    // Add this method to HDBOfficerControl to sync officer projects on startup
-public void syncOfficerProjects() {
-    // Loop through officer registrations
-    for (Map<String, Object> reg : officerRegistrations) {
-        HDBOfficer officer = (HDBOfficer) reg.get("officer");
-        Project project = (Project) reg.get("project");
-        RegistrationStatus status = (RegistrationStatus) reg.get("status");
-        
-        // If registration is approved, ensure the officer is handling the project
-        if (status == RegistrationStatus.APPROVED) {
-            officer.addHandlingProject(project);
-            project.addOfficer(officer);
-        }
-    }
-}
-    /**
- * Get all approved officers for a project
- * @param project the project
- * @return list of approved officers
- */
-public List<HDBOfficer> getApprovedOfficersForProject(Project project) {
-    List<HDBOfficer> approvedOfficers = new ArrayList<>();
-    
-    // First get from the project's officers list which is guaranteed to contain HDBOfficers
-    approvedOfficers.addAll(project.getOfficers());
-    
-    // Then add any from registrations that may not be in the project's list yet
-    for (Map<String, Object> reg : officerRegistrations) {
-        Project regProject = (Project) reg.get("project");
-        RegistrationStatus status = (RegistrationStatus) reg.get("status");
-        
-        if (regProject.getProjectID().equals(project.getProjectID()) && 
-            status == RegistrationStatus.APPROVED) {
+
+        /**
+     * Check if a user is registered as an HDB Officer
+     * @param nric the NRIC to check
+     * @return true if the user is an officer, false otherwise
+     */
+    public boolean isOfficer(String nric) {
+        try {
+            File officerFile = new File("files/resources/OfficerList.csv");
             
-            Object officer = reg.get("officer");
-            // Only add if it's an HDBOfficer and not already in the list
-            if (officer instanceof HDBOfficer) {
-                HDBOfficer hdbOfficer = (HDBOfficer) officer;
-                if (!approvedOfficers.contains(hdbOfficer)) {
-                    approvedOfficers.add(hdbOfficer);
+            if (!officerFile.exists()) {
+                return false;
+            }
+            
+            try (Scanner scanner = new Scanner(officerFile)) {
+                // Skip header
+                if (scanner.hasNextLine()) {
+                    scanner.nextLine();
                 }
+                
+                while (scanner.hasNextLine()) {
+                    String line = scanner.nextLine().trim();
+                    if (line.isEmpty()) continue;
+                    
+                    String[] fields = line.split(",");
+                    if (fields.length < 2) continue;
+                    
+                    if (fields[1].trim().equalsIgnoreCase(nric)) {
+                        return true;
+                    }
+                }
+            }
+        } catch (FileNotFoundException e) {
+            System.err.println("Error checking officer status: " + e.getMessage());
+        }
+        
+        return false;
+    }
+        
+        // Add this method to HDBOfficerControl to sync officer projects on startup
+    public void syncOfficerProjects() {
+        // Loop through officer registrations
+        for (Map<String, Object> reg : officerRegistrations) {
+            HDBOfficer officer = (HDBOfficer) reg.get("officer");
+            Project project = (Project) reg.get("project");
+            RegistrationStatus status = (RegistrationStatus) reg.get("status");
+            
+            // If registration is approved, ensure the officer is handling the project
+            if (status == RegistrationStatus.APPROVED) {
+                officer.addHandlingProject(project);
+                project.addOfficer(officer);
             }
         }
     }
-    
-    return approvedOfficers;
-}
+        /**
+     * Get all approved officers for a project
+     * @param project the project
+     * @return list of approved officers
+     */
+    public List<HDBOfficer> getApprovedOfficersForProject(Project project) {
+        List<HDBOfficer> approvedOfficers = new ArrayList<>();
+        
+        // First get from the project's officers list which is guaranteed to contain HDBOfficers
+        approvedOfficers.addAll(project.getOfficers());
+        
+        // Then add any from registrations that may not be in the project's list yet
+        for (Map<String, Object> reg : officerRegistrations) {
+            Project regProject = (Project) reg.get("project");
+            RegistrationStatus status = (RegistrationStatus) reg.get("status");
+            
+            if (regProject.getProjectID().equals(project.getProjectID()) && 
+                status == RegistrationStatus.APPROVED) {
+                
+                Object officer = reg.get("officer");
+                // Only add if it's an HDBOfficer and not already in the list
+                if (officer instanceof HDBOfficer) {
+                    HDBOfficer hdbOfficer = (HDBOfficer) officer;
+                    if (!approvedOfficers.contains(hdbOfficer)) {
+                        approvedOfficers.add(hdbOfficer);
+                    }
+                }
+            }
+        }
+        
+        return approvedOfficers;
+    }
     
     /**
      * Get pending officer registrations for a project

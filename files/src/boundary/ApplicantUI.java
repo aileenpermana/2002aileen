@@ -55,7 +55,7 @@ public class ApplicantUI {
  * Updated displayMenu method for ApplicantUI class
  */
 
-public void displayMenu() {
+ public void displayMenu() {
     boolean exit = false;
     
     while (!exit) {
@@ -64,13 +64,25 @@ public void displayMenu() {
         System.out.println("Welcome, " + currentUser.getName() + "!");
         System.out.println("1. View Available Projects");
         System.out.println("2. View My Applications");
-        System.out.println("3. Enquiry Management");  // New option
+        System.out.println("3. Enquiry Management");
         System.out.println("4. View My Profile");
         System.out.println("5. Change Password");
-        System.out.println("6. Sign Out");
+        
+        // Check if the current applicant is also an officer
+        HDBOfficerControl officerControl = new HDBOfficerControl();
+        boolean isOfficer = officerControl.isOfficer(currentUser.getNRIC());
+        
+        if (isOfficer) {
+            System.out.println("6. Switch role to HDB Officer");
+            System.out.println("7. Sign Out");
+        } else {
+            System.out.println("6. Sign Out");
+        }
         
         System.out.print("\nEnter your choice: ");
         String choice = sc.nextLine();
+        
+        int signOutIndex = isOfficer ? 7 : 6;
         
         switch (choice) {
             case "1":
@@ -80,7 +92,7 @@ public void displayMenu() {
                 viewMyApplications();
                 break;
             case "3":
-                displayEnquiryMenu();  // New method
+                displayEnquiryMenu();
                 break;
             case "4":
                 viewProfile();
@@ -88,10 +100,21 @@ public void displayMenu() {
             case "5":
                 changePassword();
                 break;
-            case "6":
-                exit = true;
-                System.out.println("Signing out...");
+            case "6": {
+                if (isOfficer) {
+                    // Switch role to Officer UI
+                    return; // Exit the menu, triggering role switch in main App
+                } else {
+                    exit = true;
+                }
                 break;
+            }
+            case "7": {
+                if (isOfficer) {
+                    exit = true;
+                }
+                break;
+            }
             default:
                 System.out.println("Invalid choice. Press Enter to continue.");
                 sc.nextLine();
@@ -854,21 +877,6 @@ private void deleteEnquiry(List<Enquiry> enquiries) {
      * @param project the project to apply for
      */
     private void applyForProject(Project project) {
-        // Check if already has an active application
-        if (currentUser.hasActiveApplications()) {
-            System.out.println("You already have an active application. Cannot apply for multiple projects.");
-            System.out.println("Press Enter to continue...");
-            sc.nextLine();
-            return;
-        }
-        
-        // Check eligibility
-        if (!project.checkEligibility(currentUser)) {
-            System.out.println("You are not eligible for this project. Please check requirements.");
-            System.out.println("Press Enter to continue...");
-            sc.nextLine();
-            return;
-        }
         
         // Confirm application
         System.out.print("Confirm application for " + project.getProjectName() + "? (Y/N): ");

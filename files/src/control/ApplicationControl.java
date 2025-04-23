@@ -34,7 +34,7 @@ public class ApplicationControl {
         }
         
         // Check if applicant is eligible for this project
-        if (!project.checkEligibility(applicant)) {
+        if (!project.checkEligibility(applicant, project.getProjectID())) {
             return false;
         }
         
