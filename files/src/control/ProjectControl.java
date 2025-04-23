@@ -465,6 +465,7 @@ public void syncManagerProjects() {
                                 HDBManager manager = project.getManagerInCharge();
                                 // Update manager's list
                                 manager.addManagedProject(project);
+                                
                             }
                             break;
                         }

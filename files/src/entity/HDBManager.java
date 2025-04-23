@@ -273,6 +273,9 @@ private String generateProjectID(String projectName) {
         
         return false;
     }
+    public void setManagingProjects(List<Project> managingProjects) {
+        this.managingProjects = managingProjects;
+    }
     // In HDBManager.java, add this method:
 
     /**

@@ -44,6 +44,11 @@ public class ManagerUI {
      */
     public void displayMenu() {
         boolean exit = false;
+        List<Project> myProjects = currentUser.getManagedProjects();
+        if (myProjects == null || myProjects.isEmpty()) {
+            myProjects = projectControl.getProjectsByManager(currentUser);
+            currentUser.setManagingProjects(myProjects);
+        } 
         
         while (!exit) {
             ScreenUtil.clearScreen();
@@ -68,22 +73,22 @@ public class ManagerUI {
                     manageProjects();
                     break;
                 case "2":
-                    viewProjects();
+                    viewProjects(myProjects);
                     break;
                 case "3":
-                    manageOfficerRegistrations();
+                    manageOfficerRegistrations(myProjects);
                     break;
                 case "4":
-                    manageApplications();
+                    manageApplications(myProjects);
                     break;
                 case "5":
-                    manageWithdrawalRequests();
+                    manageWithdrawalRequests(myProjects);
                     break;
                 case "6":
-                    viewAndReplyToEnquiries();
+                    viewAndReplyToEnquiries(myProjects);
                     break;
                 case "7":
-                    generateReports();
+                    generateReports(myProjects);
                     break;
                 case "8":
                     viewProfile();
@@ -581,7 +586,7 @@ public class ManagerUI {
     /**
      * View projects (all or filtered by manager)
      */
-    private void viewProjects() {
+    private void viewProjects(List<Project> myProjects) {
         boolean done = false;
         
         while (!done) {
@@ -599,7 +604,7 @@ public class ManagerUI {
                     viewAllProjects();
                     break;
                 case "2":
-                    viewMyProjects();
+                    viewMyProjects(myProjects);
                     break;
                 case "3":
                     done = true;
@@ -633,12 +638,12 @@ public class ManagerUI {
     /**
      * View projects managed by the current manager
      */
-    private void viewMyProjects() {
+    private void viewMyProjects(List<Project> myProjects) {
         ScreenUtil.clearScreen();
         System.out.println("\n===== My Projects =====");
         
-        List<Project> myProjects = currentUser.getManagedProjects();
-        
+               
+
         if (myProjects.isEmpty()) {
             System.out.println("You are not currently managing any projects.");
             System.out.println("Press Enter to continue...");
@@ -757,14 +762,14 @@ public class ManagerUI {
     /**
      * Manage officer registrations (view, approve, reject)
      */
-    private void manageOfficerRegistrations() {
+    private void manageOfficerRegistrations(List<Project> myProjects) {
         ScreenUtil.clearScreen();
         System.out.println("\n===== Manage Officer Registrations =====");
         
         // Get all projects managed by this manager
         List<Project> managedProjects = currentUser.getManagedProjects();
         
-        if (managedProjects.isEmpty()) {
+        if (myProjects.isEmpty()) {
             System.out.println("You are not currently managing any projects.");
             System.out.println("Press Enter to continue...");
             sc.nextLine();
@@ -800,7 +805,7 @@ public class ManagerUI {
             return;
         }
         
-        Project selectedProject = managedProjects.get(projectChoice - 1);
+        Project selectedProject = myProjects.get(projectChoice - 1);
         
         // Get officer registrations for the selected project
         List<Map<String, Object>> registrations = managerControl.getOfficerRegistrations(selectedProject);
@@ -922,14 +927,12 @@ public class ManagerUI {
     /**
      * Manage applications (approve, reject)
      */
-    private void manageApplications() {
+    private void manageApplications(List<Project> myProjects) {
         ScreenUtil.clearScreen();
         System.out.println("\n===== Manage Applications =====");
         
-        // Get all projects managed by this manager
-        List<Project> managedProjects = currentUser.getManagedProjects();
         
-        if (managedProjects.isEmpty()) {
+        if (myProjects.isEmpty()) {
             System.out.println("You are not currently managing any projects.");
             System.out.println("Press Enter to continue...");
             sc.nextLine();
@@ -938,8 +941,8 @@ public class ManagerUI {
         
         // Display the list of managed projects
         System.out.println("Select a project to manage applications:");
-        for (int i = 0; i < managedProjects.size(); i++) {
-            System.out.println((i + 1) + ". " + managedProjects.get(i).getProjectName());
+        for (int i = 0; i < myProjects.size(); i++) {
+            System.out.println((i + 1) + ". " + myProjects.get(i).getProjectName());
         }
         
         System.out.print("\nEnter project number (0 to cancel): ");
@@ -950,7 +953,7 @@ public class ManagerUI {
                 return;
             }
             
-            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
+            if (projectChoice < 1 || projectChoice > myProjects.size()) {
                 System.out.println("Invalid project number. Press Enter to continue.");
                 sc.nextLine();
                 return;
@@ -961,7 +964,7 @@ public class ManagerUI {
             return;
         }
         
-        Project selectedProject = managedProjects.get(projectChoice - 1);
+        Project selectedProject = myProjects.get(projectChoice - 1);
         
         // Get pending applications for the selected project
         List<Application> pendingApplications = applicationControl.getPendingApplications(selectedProject);
@@ -997,7 +1000,7 @@ public class ManagerUI {
                 
                 System.out.printf("%-5d %-20s %-10d %-15s %-15s\n", 
                                 (i + 1),
-                                truncateString(applicant.getName(), 20),
+                                applicant.getName(),
                                 applicant.getAge(),
                                 applicant.getMaritalStatusDisplayValue(),
                                 dateFormat.format(app.getApplicationDate()));
@@ -1182,14 +1185,12 @@ public class ManagerUI {
     /**
      * Manage withdrawal requests
      */
-    private void manageWithdrawalRequests() {
+    private void manageWithdrawalRequests(List<Project> myProjects) {
         ScreenUtil.clearScreen();
         System.out.println("\n===== Manage Withdrawal Requests =====");
         
-        // Get all projects managed by this manager
-        List<Project> managedProjects = currentUser.getManagedProjects();
         
-        if (managedProjects.isEmpty()) {
+        if (myProjects.isEmpty()) {
             System.out.println("You are not currently managing any projects.");
             System.out.println("Press Enter to continue...");
             sc.nextLine();
@@ -1198,8 +1199,8 @@ public class ManagerUI {
         
         // Display the list of managed projects
         System.out.println("Select a project to manage withdrawal requests:");
-        for (int i = 0; i < managedProjects.size(); i++) {
-            System.out.println((i + 1) + ". " + managedProjects.get(i).getProjectName());
+        for (int i = 0; i < myProjects.size(); i++) {
+            System.out.println((i + 1) + ". " + myProjects.get(i).getProjectName());
         }
         
         System.out.print("\nEnter project number (0 to cancel): ");
@@ -1210,7 +1211,7 @@ public class ManagerUI {
                 return;
             }
             
-            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
+            if (projectChoice < 1 || projectChoice > myProjects.size()) {
                 System.out.println("Invalid project number. Press Enter to continue.");
                 sc.nextLine();
                 return;
@@ -1221,7 +1222,7 @@ public class ManagerUI {
             return;
         }
         
-        Project selectedProject = managedProjects.get(projectChoice - 1);
+        Project selectedProject = myProjects.get(projectChoice - 1);
         
         // Get withdrawal requests for the selected project
         List<Application> withdrawalRequests = applicationControl.getWithdrawalRequests(selectedProject);
@@ -1350,16 +1351,14 @@ public class ManagerUI {
     /**
      * View and reply to enquiries
      */
-    private void viewAndReplyToEnquiries() {
+    private void viewAndReplyToEnquiries(List<Project> myProjects) {
         // This would be similar to the OfficerUI implementation but for all projects
         // For brevity, implementing a simplified version
         ScreenUtil.clearScreen();
         System.out.println("\n===== View & Reply to Enquiries =====");
         
-        // Get all projects managed by this manager
-        List<Project> managedProjects = currentUser.getManagedProjects();
         
-        if (managedProjects.isEmpty()) {
+        if (myProjects.isEmpty()) {
             System.out.println("You are not currently managing any projects.");
             System.out.println("Press Enter to continue...");
             sc.nextLine();
@@ -1368,8 +1367,8 @@ public class ManagerUI {
         
         // Display the list of managed projects
         System.out.println("Select a project to view enquiries:");
-        for (int i = 0; i < managedProjects.size(); i++) {
-            System.out.println((i + 1) + ". " + managedProjects.get(i).getProjectName());
+        for (int i = 0; i < myProjects.size(); i++) {
+            System.out.println((i + 1) + ". " + myProjects.get(i).getProjectName());
         }
         
         System.out.print("\nEnter project number (0 to cancel): ");
@@ -1380,7 +1379,7 @@ public class ManagerUI {
                 return;
             }
             
-            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
+            if (projectChoice < 1 || projectChoice > myProjects.size()) {
                 System.out.println("Invalid project number. Press Enter to continue.");
                 sc.nextLine();
                 return;
@@ -1391,7 +1390,7 @@ public class ManagerUI {
             return;
         }
         
-        Project selectedProject = managedProjects.get(projectChoice - 1);
+        Project selectedProject = myProjects.get(projectChoice - 1);
         
         // Display enquiries for the selected project
         List<Enquiry> enquiries = enquiryControl.getEnquiriesForProject(selectedProject);
@@ -1412,7 +1411,7 @@ public class ManagerUI {
     /**
      * Generate reports
      */
-    private void generateReports() {
+    private void generateReports(List<Project> myProjects) {
         boolean done = false;
         
         while (!done) {
@@ -1427,10 +1426,10 @@ public class ManagerUI {
             
             switch (choice) {
                 case "1":
-                    generateApplicationReport();
+                    generateApplicationReport(myProjects);
                     break;
                 case "2":
-                    generateBookingReport();
+                    generateBookingReport(myProjects);
                     break;
                 case "3":
                     done = true;
@@ -1445,14 +1444,12 @@ public class ManagerUI {
     /**
      * Generate an application report
      */
-    private void generateApplicationReport() {
+    private void generateApplicationReport(List<Project> myProjects) {
         ScreenUtil.clearScreen();
         System.out.println("\n===== Generate Application Report =====");
         
-        // Get all projects managed by this manager
-        List<Project> managedProjects = currentUser.getManagedProjects();
         
-        if (managedProjects.isEmpty()) {
+        if (myProjects.isEmpty()) {
             System.out.println("You are not currently managing any projects.");
             System.out.println("Press Enter to continue...");
             sc.nextLine();
@@ -1461,8 +1458,8 @@ public class ManagerUI {
         
         // Display the list of managed projects
         System.out.println("Select a project for the report:");
-        for (int i = 0; i < managedProjects.size(); i++) {
-            System.out.println((i + 1) + ". " + managedProjects.get(i).getProjectName());
+        for (int i = 0; i < myProjects.size(); i++) {
+            System.out.println((i + 1) + ". " + myProjects.get(i).getProjectName());
         }
         
         System.out.print("\nEnter project number (0 to cancel): ");
@@ -1473,7 +1470,7 @@ public class ManagerUI {
                 return;
             }
             
-            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
+            if (projectChoice < 1 || projectChoice > myProjects.size()) {
                 System.out.println("Invalid project number. Press Enter to continue.");
                 sc.nextLine();
                 return;
@@ -1484,7 +1481,7 @@ public class ManagerUI {
             return;
         }
         
-        Project selectedProject = managedProjects.get(projectChoice - 1);
+        Project selectedProject = myProjects.get(projectChoice - 1);
         
         // Get applications for the selected project
         List<Application> applications = applicationControl.getAllApplications(selectedProject);
@@ -1635,14 +1632,12 @@ public class ManagerUI {
     /**
      * Generate a flat booking report
      */
-    private void generateBookingReport() {
+    private void generateBookingReport(List<Project> myProjects) {
         ScreenUtil.clearScreen();
         System.out.println("\n===== Generate Flat Booking Report =====");
         
-        // Get all projects managed by this manager
-        List<Project> managedProjects = currentUser.getManagedProjects();
         
-        if (managedProjects.isEmpty()) {
+        if (myProjects.isEmpty()) {
             System.out.println("You are not currently managing any projects.");
             System.out.println("Press Enter to continue...");
             sc.nextLine();
@@ -1651,8 +1646,8 @@ public class ManagerUI {
         
         // Display the list of managed projects
         System.out.println("Select a project for the report:");
-        for (int i = 0; i < managedProjects.size(); i++) {
-            System.out.println((i + 1) + ". " + managedProjects.get(i).getProjectName());
+        for (int i = 0; i < myProjects.size(); i++) {
+            System.out.println((i + 1) + ". " + myProjects.get(i).getProjectName());
         }
         
         System.out.print("\nEnter project number (0 to cancel): ");
@@ -1663,7 +1658,7 @@ public class ManagerUI {
                 return;
             }
             
-            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
+            if (projectChoice < 1 || projectChoice > myProjects.size()) {
                 System.out.println("Invalid project number. Press Enter to continue.");
                 sc.nextLine();
                 return;
@@ -1674,7 +1669,7 @@ public class ManagerUI {
             return;
         }
         
-        Project selectedProject = managedProjects.get(projectChoice - 1);
+        Project selectedProject = myProjects.get(projectChoice - 1);
         
         // Get booked applications for the selected project
         List<Application> bookedApplications = applicationControl.getBookedApplications(selectedProject);

@@ -895,24 +895,6 @@ private void deleteEnquiry(List<Enquiry> enquiries) {
      * @param project the project to register for
      */
     private void registerAsOfficer(Project project) {
-        // Check if there are available officer slots
-        if (project.getAvailableOfficerSlots() <= 0) {
-            System.out.println("No available officer slots for this project.");
-            System.out.println("Press Enter to continue...");
-            sc.nextLine();
-            return;
-        }
-        
-        // Check if already registered or applied for this project
-        for (Application app : currentUser.getApplications()) {
-            if (app.getProject().equals(project)) {
-                System.out.println("You have already applied for this project as an Applicant.");
-                System.out.println("You cannot be both an Applicant and an Officer for the same project.");
-                System.out.println("Press Enter to continue...");
-                sc.nextLine();
-                return;
-            }
-        }
         
         // Confirm registration
         System.out.print("Confirm registration as HDB Officer for " + project.getProjectName() + "? (Y/N): ");
