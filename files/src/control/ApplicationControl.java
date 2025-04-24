@@ -94,94 +94,40 @@ private Applicant findOrCreateApplicant(String nric) {
     return (Applicant) UserDataLookup.createFallbackUser(nric, "Applicant");
 }
 
-    /**
-     * Withdraw an application
-     * @param application the application to withdraw
-     * @return true if withdrawal request is successful, false otherwise
-     */
-    public boolean withdrawApplication(Application application) {
-        // Check if application can be withdrawn
-        if (!application.canWithdraw()) {
-            return false;
-        }
-        
-        // Create a withdrawal request
-        Map<String, Object> request = new HashMap<>();
-        request.put("application", application);
-        request.put("requestDate", new Date());
-        request.put("status", "PENDING");
-        
-        // Add to list
-        withdrawalRequests.add(request);
-        
-        // Save to file
-        return saveWithdrawalRequests();
+public boolean withdrawApplication(Application application) {
+    if (!application.canWithdraw()) {
+        return false;
     }
     
-    // In ApplicationControl.java - processWithdrawalRequest method
-public boolean processWithdrawalRequest(Application application, boolean approve) {
-    // Find the request
-    Map<String, Object> request = null;
-    for (Map<String, Object> req : withdrawalRequests) {
-        Application reqApp = (Application) req.get("application");
-        if (reqApp.getApplicationID().equals(application.getApplicationID())) {
-            request = req;
-            break;
-        }
+    // Store the original status for later use
+    ApplicationStatus originalStatus = application.getStatus();
+    
+    // Update the application status to withdrawal requested
+    application.setStatus(ApplicationStatus.WITHDRAW);
+    application.setStatusUpdateDate(new Date());
+    
+    // If this is a BOOKED application, we need to capture the flat info for logging purposes
+    String bookedFlatInfo = "";
+    if (originalStatus == ApplicationStatus.BOOKED && application.getBookedFlat() != null) {
+        Flat bookedFlat = application.getBookedFlat();
+        bookedFlatInfo = String.format("Flat [ID: %s, Type: %s]", 
+                                     bookedFlat.getFlatID(), 
+                                     bookedFlat.getType().getDisplayValue());
+        
+        System.out.println("Withdrawal requested for booked flat: " + bookedFlatInfo);
     }
     
-    if (request == null) {
-        return false; // Request not found
+    boolean success = updateApplication(application);
+    if (success) {
+        System.out.println("Application status updated to WITHDRAW. Original status: " + originalStatus);
+        saveApplications();
     }
     
-    if (approve) {
-        // Update application status
-        ApplicationStatus currentStatus = application.getStatus();
-        application.setStatus(ApplicationStatus.UNSUCCESSFUL);  // Set to UNSUCCESSFUL when approved
-        
-        // If the application was successful or booked, increment available units
-        if (currentStatus == ApplicationStatus.SUCCESSFUL || currentStatus == ApplicationStatus.BOOKED) {
-            Project project = application.getProject();
-            
-            // If flat was booked, free it
-            if (currentStatus == ApplicationStatus.BOOKED) {
-                Flat bookedFlat = application.getBookedFlat();
-                if (bookedFlat != null) {
-                    FlatType flatType = bookedFlat.getType();
-                    bookedFlat.setBookedByApplication(null);
-                    application.setBookedFlat(null);
-                    application.getApplicant().setBookedFlat(null);
-                    
-                    // Increment available units
-                    project.incrementAvailableUnits(flatType);
-                }
-            } else {
-                // For successful applications without a booked flat, determine flat type
-                FlatType flatType = determineEligibleFlatType(application);
-                if (flatType != null) {
-                    project.incrementAvailableUnits(flatType);
-                }
-            }
-            
-            // Update project
-            ProjectControl projectControl = new ProjectControl();
-            projectControl.updateProject(project);
-        }
-        
-        // Update request status
-        request.put("status", "APPROVED");
-        
-        // Save changes to CSV
-        saveApplications();  // Update the applications CSV
-        saveWithdrawalRequests();  // Update the withdrawal requests CSV
-        
-        return true;
-    } else {
-        // Just update request status
-        request.put("status", "REJECTED");
-        return saveWithdrawalRequests();
-    }
+    return success;
 }
+
+    
+    
     
     /**
      * Get all applications in the system
@@ -208,11 +154,6 @@ public boolean processWithdrawalRequest(Application application, boolean approve
         return projectApplications;
     }
     
-    /**
-     * Get pending applications for a project
-     * @param project the project
-     * @return list of pending applications
-     */
     public List<Application> getPendingApplications(Project project) {
         List<Application> pendingApplications = new ArrayList<>();
         
@@ -225,6 +166,8 @@ public boolean processWithdrawalRequest(Application application, boolean approve
         
         return pendingApplications;
     }
+
+    
     
     /**
      * Get successful (approved but not yet booked) applications for a project
@@ -262,25 +205,20 @@ public boolean processWithdrawalRequest(Application application, boolean approve
         return bookedApplications;
     }
     
-    /**
-     * Get withdrawal requests for a project
-     * @param project the project
-     * @return list of withdrawal requests
-     */
     public List<Application> getWithdrawalRequests(Project project) {
-        List<Application> projectWithdrawalRequests = new ArrayList<>();
+        List<Application> withdrawalRequests = new ArrayList<>();
         
-        for (Map<String, Object> request : withdrawalRequests) {
-            if ("PENDING".equals(request.get("status"))) {
-                Application app = (Application) request.get("application");
-                if (app.getProject().getProjectID().equals(project.getProjectID())) {
-                    projectWithdrawalRequests.add(app);
-                }
+        for (Application app : applications) {
+            if (app.getProject().getProjectID().equals(project.getProjectID()) && 
+                app.getStatus() == ApplicationStatus.WITHDRAW) {
+                withdrawalRequests.add(app);
             }
         }
         
-        return projectWithdrawalRequests;
+        return withdrawalRequests;
     }
+
+    
     
     /**
      * Update an application
@@ -399,13 +337,30 @@ public boolean processWithdrawalRequest(Application application, boolean approve
                 app.setStatus(ApplicationStatus.UNSUCCESSFUL);
                 processed++;
             }
+            app.setStatusUpdateDate(new Date());
+            boolean success = updateApplication(app);
+            if (success) {
+                saveApplications();
+            }
         }
         
-        // Save applications
-        saveApplications();
         
         return processed;
     }
+
+    public List<Application> getApplicationByUser(Applicant applicant) {
+        List<Application> allApplication = getAllApplications();
+        List<Application> applicantApplication = new ArrayList<>();
+        
+        for (Application app : allApplication) {
+            if (app.getApplicant().getNRIC().equals(applicant.getNRIC())) {
+                applicantApplication.add(app);
+            }
+        }
+        
+        return applicantApplication;
+    }
+    
     
     /**
      * Determine which flat type an applicant is eligible for
@@ -435,10 +390,6 @@ public boolean processWithdrawalRequest(Application application, boolean approve
         return null;
     }
     
-    /**
-     * Load applications from file
-     * @return list of applications
-     */
     private List<Application> loadApplications() {
         List<Application> loadedApplications = new ArrayList<>();
         
@@ -468,8 +419,14 @@ public boolean processWithdrawalRequest(Application application, boolean approve
                     String line = fileScanner.nextLine().trim();
                     if (line.isEmpty()) continue;
                     
+                    // Log the line we're trying to parse for debugging
+                    System.out.println("Loading application from line: " + line);
+                    
                     String[] values = line.split(",");
-                    if (values.length < 6) continue; // Invalid line
+                    if (values.length < 6) {
+                        System.err.println("ERROR: Invalid application line format: " + line);
+                        continue; // Invalid line
+                    }
                     
                     // Parse application data
                     try {
@@ -481,8 +438,19 @@ public boolean processWithdrawalRequest(Application application, boolean approve
                         long statusUpdateDate = Long.parseLong(values[5].trim());
                         String bookedFlatID = values.length > 6 ? values[6].trim() : "";
                         
-                        // Convert status string to enum
-                        ApplicationStatus status = ApplicationStatus.valueOf(statusStr);
+                        // Convert status string to enum - Extra debug logging for important statuses
+                        ApplicationStatus status;
+                        try {
+                            status = ApplicationStatus.valueOf(statusStr);
+                            if (status == ApplicationStatus.WITHDRAW || status == ApplicationStatus.UNSUCCESSFUL) {
+                                System.out.println("Found application with important status: " + applicationID + 
+                                                  " - Status: " + status);
+                            }
+                        } catch (IllegalArgumentException e) {
+                            System.err.println("ERROR: Invalid status in application: " + statusStr);
+                            System.err.println("Defaulting to PENDING status");
+                            status = ApplicationStatus.PENDING;
+                        }
                         
                         // Find or create applicant
                         Applicant applicant = findOrCreateApplicant(applicantNRIC);
@@ -511,6 +479,7 @@ public boolean processWithdrawalRequest(Application application, boolean approve
                         
                     } catch (Exception e) {
                         System.err.println("Error parsing application data: " + e.getMessage());
+                        e.printStackTrace();
                     }
                 }
             }
@@ -520,6 +489,8 @@ public boolean processWithdrawalRequest(Application application, boolean approve
         
         return loadedApplications;
     }
+
+    
     
     /**
      * Load withdrawal requests from file
@@ -590,11 +561,7 @@ public boolean processWithdrawalRequest(Application application, boolean approve
         return loadedRequests;
     }
     
-    /**
-     * Save applications to file
-     * @return true if successful, false otherwise
-     */
-    private boolean saveApplications() {
+    public boolean saveApplications() {
         try {
             // Create directories if they don't exist
             File directory = new File("files/resources");
@@ -602,33 +569,56 @@ public boolean processWithdrawalRequest(Application application, boolean approve
                 directory.mkdirs();
             }
             
+            // Create backup of existing file before saving
+            File existingFile = new File(APPLICATIONS_FILE);
+            if (existingFile.exists()) {
+                String backupFile = APPLICATIONS_FILE + ".bak";
+                try {
+                    java.nio.file.Files.copy(existingFile.toPath(), new File(backupFile).toPath(), 
+                                     java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    System.out.println("Backup created: " + backupFile);
+                } catch (Exception e) {
+                    System.err.println("Warning: Could not create backup: " + e.getMessage());
+                }
+            }
+            
+            System.out.println("Saving " + applications.size() + " applications to " + APPLICATIONS_FILE);
+            
             try (PrintWriter writer = new PrintWriter(new FileWriter(APPLICATIONS_FILE))) {
                 // Write header
                 writer.println("ApplicationID,ApplicantNRIC,ProjectID,Status,ApplicationDate,StatusUpdateDate,BookedFlatID");
                 
-                // Write applications
+                // Write applications - Make sure status is properly saved
                 for (Application app : applications) {
-                    writer.print(
-                        app.getApplicationID() + "," +
-                        app.getApplicant().getNRIC() + "," +
-                        app.getProject().getProjectID() + "," +
-                        app.getStatus() + "," +
-                        app.getApplicationDate().getTime() + "," +
-                        app.getStatusUpdateDate().getTime()
-                    );
+                    // Create a debug string to log special statuses
+                    if (app.getStatus() == ApplicationStatus.WITHDRAW || 
+                        app.getStatus() == ApplicationStatus.UNSUCCESSFUL) {
+                        System.out.println("Saving application with status: " + app.getStatus() + 
+                                         " - ID: " + app.getApplicationID());
+                    }
+                    
+                    StringBuilder sb = new StringBuilder();
+                    sb.append(app.getApplicationID()).append(",");
+                    sb.append(app.getApplicant().getNRIC()).append(",");
+                    sb.append(app.getProject().getProjectID()).append(",");
+                    sb.append(app.getStatus()).append(","); // Save enum name
+                    sb.append(app.getApplicationDate().getTime()).append(",");
+                    sb.append(app.getStatusUpdateDate().getTime());
                     
                     // Add booked flat ID if any
                     if (app.getBookedFlat() != null) {
-                        writer.print("," + app.getBookedFlat().getFlatID());
+                        sb.append(",").append(app.getBookedFlat().getFlatID());
                     }
                     
-                    writer.println();
+                    writer.println(sb.toString());
                 }
+                
+                System.out.println("Applications saved successfully.");
+                return true;
             }
-            
-            return true;
         } catch (IOException e) {
-            System.err.println("Error saving applications: " + e.getMessage());
+            System.err.println("ERROR saving applications: " + e.getMessage());
+            e.printStackTrace(); // Print full stack trace for debugging
             return false;
         }
     }

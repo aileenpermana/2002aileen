@@ -1,5 +1,6 @@
 package entity;
 
+import control.ApplicationControl;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -86,6 +87,10 @@ public class Applicant extends User {
     public List<Application> getApplications() {
         return new ArrayList<>(applications);
     }
+
+    public void setApplications(List<Application> applications) {
+        this.applications = applications;
+    }
     
     /**
      * Get current booked flat
@@ -127,18 +132,14 @@ public class Applicant extends User {
         return false;
     }
     
-    /**
-     * Request withdrawal of an application
-     * @param application the application to withdraw
-     * @return true if request was successful, false otherwise
-     */
     public boolean requestWithdrawal(Application application) {
-        if (applications.contains(application) && application.canWithdraw()) {
-            // Set status to indicate withdrawal request
-            // (In a real system, you might want a specific status for this)
-            return true;
+        if (!applications.contains(application) || !application.canWithdraw()) {
+            return false;
         }
-        return false;
+        
+        // Create ApplicationControl and withdraw
+        ApplicationControl applicationControl = new ApplicationControl();
+        return applicationControl.withdrawApplication(application);
     }
     
 }

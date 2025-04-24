@@ -145,12 +145,28 @@ public class Project {
     public int getAvailableUnitsByType(FlatType type) {
         return availableUnits.getOrDefault(type, 0);
     }
+
+
+    public void printProjectState() {
+        System.out.println("Project State for: " + projectName + " (ID: " + projectID + ")");
+        System.out.println("Neighborhood: " + neighborhood);
+        System.out.println("Flat Types and Units:");
+        
+        for (FlatType type : FlatType.values()) {
+            int total = totalUnits.getOrDefault(type, 0);
+            int available = availableUnits.getOrDefault(type, 0);
+            
+            if (total > 0) {
+                System.out.println("- " + type.getDisplayValue() + ": " + 
+                                 available + " available out of " + total + " total");
+            }
+        }
+        
+        System.out.println("Officer Slots: " + availableOfficerSlots + " available out of " + maxOfficerSlots);
+        System.out.println("Visibility: " + (isVisible ? "Visible" : "Hidden"));
+    }
     
-    /**
-     * Set the number of available units for a flat type
-     * @param type the flat type
-     * @param count the new count of available units
-     */
+    
     public void setAvailableUnitsByType(FlatType type, int count) {
         // Can't have more available units than total units
         int total = totalUnits.getOrDefault(type, 0);
@@ -163,23 +179,35 @@ public class Project {
             count = 0;
         }
         
+        // Update the map
         availableUnits.put(type, count);
+        
+        // Log the update for debugging
+        System.out.println("Set available units for " + type.getDisplayValue() + " to " + count);
     }
     
-    /**
-     * Decrement available units for a flat type
-     * @param type the flat type
-     * @return true if successful, false if no units available
-     */
+    
     public boolean decrementAvailableUnits(FlatType type) {
-        int available = availableUnits.getOrDefault(type, 0);
-        if (available <= 0) {
+        // Get current available units
+        Integer available = availableUnits.get(type);
+        
+        // If no entry exists for this type or available units <= 0
+        if (available == null || available <= 0) {
+            System.out.println("Cannot decrement: No available units of type " + type.getDisplayValue());
             return false;
         }
         
-        availableUnits.put(type, available - 1);
+        // Decrement available units
+        int newAvailable = available - 1;
+        availableUnits.put(type, newAvailable);
+        
+        // Log the update for debugging
+        System.out.println("Decremented available units for " + type.getDisplayValue() + 
+                         " from " + available + " to " + newAvailable);
+        
         return true;
     }
+    
     
     /**
      * Increment available units for a flat type
@@ -234,17 +262,17 @@ public class Project {
  * Check if the project is open for application
  * @return true if within application period, false otherwise
  */
-    public boolean isOpenForApplication() {
-        Date now = new Date();
-        
-        // Project must be visible
-        if (!isVisible()) {
-            return false;
-        }
-        
-        // Current date must be between open and close dates (inclusive)
-        return now.compareTo(applicationOpenDate) >= 0 && now.compareTo(applicationCloseDate) <= 0;
+public boolean isOpenForApplication() {
+    Date now = new Date();
+    
+    // Project must be visible
+    if (!isVisible()) {
+        return false;
     }
+    
+    // Current date must be between open and close dates (inclusive)
+    return now.compareTo(applicationOpenDate) >= 0 && now.compareTo(applicationCloseDate) <= 0;
+}
     
     /**
      * Get the manager in charge

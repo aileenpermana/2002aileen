@@ -1,5 +1,6 @@
 package entity;
 
+import control.ApplicationControl;
 import control.HDBOfficerControl;
 import control.ProjectControl;
 import java.util.ArrayList;
@@ -279,12 +280,30 @@ public boolean processOfficerRegistration(User user, Project project, boolean ap
             this.managingProjects.add(project);
         }
     }
-    /**
-     * Process a withdrawal request
-     * @param application the application to withdraw
-     * @param approve true to approve, false to reject
-     * @return true if operation was successful, false otherwise
-     */
+
+    private FlatType determineEligibleFlatTypeForWithdrawal(Application application) {
+        Applicant applicant = application.getApplicant();
+        Project project = application.getProject();
+        
+        if (applicant.getMaritalStatus() == MaritalStatus.SINGLE) {
+            // Singles can only apply for 2-Room
+            if (applicant.getAge() >= 35 && project.hasFlatType(FlatType.TWO_ROOM)) {
+                return FlatType.TWO_ROOM;
+            }
+        } else if (applicant.getMaritalStatus() == MaritalStatus.MARRIED) {
+            // For married couples, check which type they're applying for
+            // In a real system, this would be stored in the application
+            // For now, we'll assume they're applying for 3-Room if available
+            if (project.hasFlatType(FlatType.THREE_ROOM)) {
+                return FlatType.THREE_ROOM;
+            } else if (project.hasFlatType(FlatType.TWO_ROOM)) {
+                return FlatType.TWO_ROOM;
+            }
+        }
+        
+        return null;
+    }
+    
     public boolean processWithdrawalRequest(Application application, boolean approve) {
         Project project = application.getProject();
         
@@ -294,33 +313,77 @@ public boolean processOfficerRegistration(User user, Project project, boolean ap
         }
         
         if (approve) {
-            // Check current status
+            // Store the current status for logging
             ApplicationStatus currentStatus = application.getStatus();
+            System.out.println("Processing withdrawal approval. Current status: " + currentStatus);
             
             // Reset the application status to allow new applications
             application.setStatus(ApplicationStatus.UNSUCCESSFUL);
+            application.setStatusUpdateDate(new Date());
             
             // If the application was successful or booked, increment available units
             if (currentStatus == ApplicationStatus.SUCCESSFUL || currentStatus == ApplicationStatus.BOOKED) {
-                // In a real system, you would determine the flat type from the application
-                FlatType flatType = FlatType.TWO_ROOM; // Placeholder
-                project.incrementAvailableUnits(flatType);
-                
                 // If flat was booked, free it
                 if (currentStatus == ApplicationStatus.BOOKED) {
                     Flat bookedFlat = application.getBookedFlat();
                     if (bookedFlat != null) {
+                        FlatType flatType = bookedFlat.getType();
+                        
+                        // Log before incrementing
+                        System.out.println("Before incrementing: " + project.getAvailableUnitsByType(flatType) + 
+                                         " available units of type " + flatType.getDisplayValue());
+                        
+                        // Increment the available units for this flat type
+                        project.incrementAvailableUnits(flatType);
+                        
+                        // Log after incrementing
+                        System.out.println("After incrementing: " + project.getAvailableUnitsByType(flatType) + 
+                                         " available units of type " + flatType.getDisplayValue());
+                        
+                        // Clear references
                         bookedFlat.setBookedByApplication(null);
                         application.setBookedFlat(null);
+                        
+                        // Also update the applicant
+                        Applicant applicant = application.getApplicant();
+                        applicant.setBookedFlat(null);
+                        
+                        // Update the project in the system
+                        ProjectControl projectControl = new ProjectControl();
+                        boolean projectUpdated = projectControl.updateProject(project);
+                        
+                        System.out.println("Project updated: " + projectUpdated);
+                    }
+                } else if (currentStatus == ApplicationStatus.SUCCESSFUL) {
+                    // For successful applications, we need to determine the flat type
+                    FlatType flatType =  determineEligibleFlatTypeForWithdrawal(application);
+                    if (flatType != null) {
+                        project.incrementAvailableUnits(flatType);
+                        
+                        // Update the project in the system
+                        ProjectControl projectControl = new ProjectControl();
+                        projectControl.updateProject(project);
                     }
                 }
-                
-                // Save changes via Project Control
-                ProjectControl projectControl = new ProjectControl();
-                projectControl.updateProject(project);
+            }
+
+            
+            
+            // Update the application in the system
+            ApplicationControl applicationControl = new ApplicationControl();
+            boolean appUpdated = applicationControl.updateApplication(application);
+            
+            if (appUpdated) {
+                applicationControl.saveApplications();
+                System.out.println("Application updated successfully.");
+                return true;
+            } else {
+                System.out.println("Failed to update application.");
+                return false;
             }
         }
         
-        return true;
+        return false;
     }
-}
+        
+    }

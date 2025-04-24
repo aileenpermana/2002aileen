@@ -9,7 +9,6 @@ import java.util.*;
  */
 public class HDBOfficerControl {
     private static final String OFFICER_REGISTRATIONS_FILE = "files/resources/OfficerRegistrations.csv";
-    private static final String RECEIPTS_FILE = "files/resources/BookingReceipts.csv";
     private List<Map<String, Object>> officerRegistrations;
     
     /**
@@ -602,100 +601,157 @@ private boolean addUserToOfficerFile(HDBOfficer officer) {
         );
     }
     
-    // Other methods from the original class...
+    public boolean bookFlatForApplicant(HDBOfficer officer, Application application, FlatType flatType) {
+        // Validate input
+        if (officer == null || application == null || flatType == null) {
+            System.out.println("Invalid inputs for booking");
+            return false;
+        }
+    
+        // Check if the officer is handling this project
+        Project project = application.getProject();
+        if (!officer.isHandlingProject(project)) {
+            System.out.println("Officer is not handling this project");
+            return false;
+        }
+    
+        // Check application status
+        if (application.getStatus() != ApplicationStatus.SUCCESSFUL) {
+            System.out.println("Application not in SUCCESSFUL state");
+            return false;
+        }
+    
+        // Check if the project has available units of the specified flat type
+        int availableUnits = project.getAvailableUnitsByType(flatType);
+        System.out.println("Available units before booking: " + availableUnits);
+        
+        if (availableUnits <= 0) {
+            System.out.println("No available units of type: " + flatType.getDisplayValue());
+            return false;
+        }
+    
+        // Validate applicant's eligibility for this flat type
+        Applicant applicant = application.getApplicant();
+        if (!isApplicantEligibleForFlatType(applicant, flatType, project)) {
+            System.out.println("Applicant not eligible for this flat type");
+            return false;
+        }
+    
+        // Print project state before making changes
+        System.out.println("Project state BEFORE booking:");
+        project.printProjectState();
+    
+        // Generate a new Flat object
+        String flatID = generateFlatID(project, flatType);
+        Flat bookedFlat = new Flat(flatID, project, flatType);
+        System.out.println("Generated flat ID: " + flatID);
+    
+        // Update project's available units
+        boolean decrementSuccess = project.decrementAvailableUnits(flatType);
+        if (!decrementSuccess) {
+            System.out.println("Failed to decrement available units");
+            return false;
+        }
+        
+        // Print project state after decrementing
+        System.out.println("Project state AFTER decrementing:");
+        project.printProjectState();
+    
+        // Update application status to BOOKED
+        application.setStatus(ApplicationStatus.BOOKED);
+        application.setBookedFlat(bookedFlat);
+        application.setStatusUpdateDate(new Date());
+    
+        // Update applicant's booked flat
+        applicant.setBookedFlat(bookedFlat);
+    
+        // Save changes
+        ApplicationControl applicationControl = new ApplicationControl();
+        boolean applicationSaved = applicationControl.updateApplication(application);
+        
+        if (applicationSaved) {
+            System.out.println("Application updated successfully");
+            applicationControl.saveApplications();
+        } else {
+            System.out.println("Failed to update application");
+        }
+        
+        // Update project in CSV
+        ProjectControl projectControl = new ProjectControl();
+        boolean projectUpdated = projectControl.updateProject(project);
+        
+        // Print final state for verification
+        System.out.println("Final project state:");
+        project.printProjectState();
+        System.out.println("Project units updated in CSV: " + projectUpdated);
+    
+        if (applicationSaved && projectUpdated) {
+            return true;
+        }
+    
+        return false;
+    }
+
+    /**
+     * Check if an applicant is eligible for a specific flat type
+     * @param applicant the applicant
+     * @param flatType the flat type
+     * @param project the project
+     * @return true if eligible, false otherwise
+     */
+    private boolean isApplicantEligibleForFlatType(Applicant applicant, FlatType flatType, Project project) {
+        // Single applicants: only 2-Room, 35 years and above
+        if (applicant.getMaritalStatus() == MaritalStatus.SINGLE) {
+            return flatType == FlatType.TWO_ROOM && applicant.getAge() >= 35;
+        }
+        
+        // Married applicants: any flat type, 21 years and above
+        if (applicant.getMaritalStatus() == MaritalStatus.MARRIED) {
+            return applicant.getAge() >= 21 && project.hasFlatType(flatType);
+        }
+        
+        return false;
+    }
+
+    /**
+     * Generate a unique Flat ID
+     * @param project the project
+     * @param flatType the flat type
+     * @return a generated flat ID
+     */
+    private String generateFlatID(Project project, FlatType flatType) {
+        // Format: F-{ProjectID}-{FlatTypeCode}-{SequentialNumber}
+        String typeCode = flatType == FlatType.TWO_ROOM ? "2R" : "3R";
+        int sequentialNumber = project.getTotalUnitsByType(flatType) - 
+                               project.getAvailableUnitsByType(flatType) + 1;
+        
+        return String.format("F-%s-%s-%d", 
+                             project.getProjectID(), 
+                             typeCode, 
+                             sequentialNumber);
+    }
+
+    /**
+     * Generate a booking receipt
+     * @param application the booked application
+     * @param officer the officer who processed the booking
+     * @return the generated receipt
+     */
+    private Receipt generateBookingReceipt(Application application, HDBOfficer officer) {
+        Receipt receipt = new Receipt(
+            "REC-" + application.getApplicationID(), 
+            application, 
+            officer
+        );
+        
+        // Optional: Save receipt to file
+        receipt.saveReceiptToFile("files/resources/BookingReceipts/" + receipt.getReceiptID() + ".txt");
+        
+        return receipt;
+    }
 
     
-    /**
-     * Generate a receipt for a booking
-     * @param application the application with a booked flat
-     * @return the receipt string
-     */
-    public String generateReceipt(Application application) {
-        if (application.getStatus() != ApplicationStatus.BOOKED || application.getBookedFlat() == null) {
-            return null; // Cannot generate receipt for non-booked applications
-        }
-        
-        StringBuilder receipt = new StringBuilder();
-        Applicant applicant = application.getApplicant();
-        Project project = application.getProject();
-        Flat flat = application.getBookedFlat();
-        
-        receipt.append("====================================================\n");
-        receipt.append("                BOOKING RECEIPT                     \n");
-        receipt.append("====================================================\n");
-        receipt.append("Receipt ID: REC-").append(application.getApplicationID()).append("\n");
-        receipt.append("Date: ").append(new Date()).append("\n\n");
-        
-        receipt.append("APPLICANT DETAILS:\n");
-        receipt.append("Name: ").append(applicant.getName()).append("\n");
-        receipt.append("NRIC: ").append(applicant.getNRIC()).append("\n");
-        receipt.append("Age: ").append(applicant.getAge()).append("\n");
-        receipt.append("Marital Status: ").append(applicant.getMaritalStatusDisplayValue()).append("\n\n");
-        
-        receipt.append("PROJECT DETAILS:\n");
-        receipt.append("Project Name: ").append(project.getProjectName()).append("\n");
-        receipt.append("Neighborhood: ").append(project.getNeighborhood()).append("\n\n");
-        
-        receipt.append("FLAT DETAILS:\n");
-        receipt.append("Flat ID: ").append(flat.getFlatID()).append("\n");
-        receipt.append("Flat Type: ").append(flat.getType().getDisplayValue()).append("\n\n");
-        
-        receipt.append("This receipt confirms the booking of the flat.\n");
-        receipt.append("Please keep this receipt for your records.\n");
-        receipt.append("====================================================\n");
-        
-        // Save receipt to file
-        saveReceipt(application);
-        
-        return receipt.toString();
-    }
     
-    /**
-     * Save a receipt to the receipts file
-     * @param application the application with booking details
-     */
-    private void saveReceipt(Application application) {
-        try {
-            // Create directories if they don't exist
-            File directory = new File("files/resources/Receipt.csv");
-            if (!directory.exists()) {
-                directory.mkdirs();
-            }
-            
-            // Check if file exists, create with header if not
-            File receiptFile = new File("files/resources/Receipt.csv");
-            boolean fileExists = receiptFile.exists();
-            
-            try (FileWriter fw = new FileWriter(receiptFile, true);
-                 BufferedWriter bw = new BufferedWriter(fw);
-                 PrintWriter writer = new PrintWriter(bw)) {
-                
-                // Add header if file is new
-                if (!fileExists) {
-                    writer.println("ReceiptID,ApplicationID,ApplicantNRIC,ProjectID,FlatID,FlatType,GenerationDate");
-                }
-                
-                // Write receipt data
-                Applicant applicant = application.getApplicant();
-                Project project = application.getProject();
-                Flat flat = application.getBookedFlat();
-                
-                String receiptID = "REC-" + application.getApplicationID();
-                
-                writer.println(
-                    receiptID + "," +
-                    application.getApplicationID() + "," +
-                    applicant.getNRIC() + "," +
-                    project.getProjectID() + "," +
-                    flat.getFlatID() + "," +
-                    flat.getType() + "," +
-                    System.currentTimeMillis()
-                );
-            }
-        } catch (IOException e) {
-            System.out.println("Error loading officer registrations: " + e.getMessage());
-        }
-    }
     
     /**
      * Find an application by NRIC and project

@@ -51,55 +51,56 @@ public class ApplicantUI {
     /**
      * Display the main menu for Applicants
      */
-    /**
- * Updated displayMenu method for ApplicantUI class
- */
-
- public boolean displayMenu() {
-    boolean exit = false;
-    
-    while (!exit) {
-        ScreenUtil.clearScreen();
-        System.out.println("\n===== Applicant Menu =====");
-        System.out.println("Welcome, " + currentUser.getName() + "!");
-        System.out.println("1. View Available Projects");
-        System.out.println("2. View My Applications");
-        System.out.println("3. Enquiry Management");
-        System.out.println("4. View My Profile");
-        System.out.println("5. Change Password");
+    public boolean displayMenu() {
+        boolean exit = false;
+        List<Application> myApplication = currentUser.getApplications();
+        if (myApplication == null || myApplication.isEmpty()) {
+            myApplication = applicationControl.getApplicationByUser(currentUser);
+            currentUser.setApplications(myApplication);
+        } 
         
-        // Check if the current applicant is also an officer
-        HDBOfficerControl officerControl = new HDBOfficerControl();
-        boolean isOfficer = officerControl.isOfficer(currentUser.getNRIC());
-        
-        if (isOfficer) {
-            System.out.println("6. Switch role to HDB Officer");
-            System.out.println("7. Sign Out");
-        } else {
-            System.out.println("6. Sign Out");
-        }
-        
-        System.out.print("\nEnter your choice: ");
-        String choice = sc.nextLine();
-        
-        int signOutIndex = isOfficer ? 7 : 6;
-        
-        switch (choice) {
-            case "1":
-                viewAvailableProjects();
-                break;
-            case "2":
-                viewMyApplications();
-                break;
-            case "3":
-                displayEnquiryMenu();
-                break;
-            case "4":
-                viewProfile();
-                break;
-            case "5":
-                changePassword();
-                break;
+        while (!exit) {
+            ScreenUtil.clearScreen();
+            System.out.println("\n===== Applicant Menu =====");
+            System.out.println("Welcome, " + currentUser.getName() + "!");
+            System.out.println("1. View Available Projects");
+            System.out.println("2. View My Applications");
+            System.out.println("3. Enquiry Management");
+            System.out.println("4. View My Profile");
+            System.out.println("5. Change Password");
+            
+            // Check if the current applicant is also an officer
+            HDBOfficerControl officerControl = new HDBOfficerControl();
+            boolean isOfficer = officerControl.isOfficer(currentUser.getNRIC());
+            
+            if (isOfficer) {
+                System.out.println("6. Switch role to HDB Officer");
+                System.out.println("7. Sign Out");
+            } else {
+                System.out.println("6. Sign Out");
+            }
+            
+            System.out.print("\nEnter your choice: ");
+            String choice = sc.nextLine();
+            
+            int signOutIndex = isOfficer ? 7 : 6;
+            
+            switch (choice) {
+                case "1":
+                    viewAvailableProjects();
+                    break;
+                case "2":
+                    viewMyApplications();
+                    break;
+                case "3":
+                    displayEnquiryMenu();
+                    break;
+                case "4":
+                    viewProfile();
+                    break;
+                case "5":
+                    changePassword();
+                    break;
                 case "6": {
                     if (isOfficer) {
                         // Switch role to Officer UI
@@ -114,189 +115,195 @@ public class ApplicantUI {
                     }
                     break;
                 }
-            default:
-                System.out.println("Invalid choice. Press Enter to continue.");
-                sc.nextLine();
+                default:
+                    System.out.println("Invalid choice. Press Enter to continue.");
+                    sc.nextLine();
+            }
         }
+        return false;
     }
-    return false;
-}
     
     private void viewAvailableProjects() {
-    boolean exitToMain = false;
-    
-    while (!exitToMain) {
-        ScreenUtil.clearScreen();
-        System.out.println("\n===== Available Projects =====");
+        boolean exitToMain = false;
         
-        // Get projects based on applicant's eligibility
-        List<Project> eligibleProjects = projectControl.getEligibleProjects(currentUser);
-        
-        if (eligibleProjects.isEmpty()) {
-            System.out.println("No eligible projects available for you at this time.");
-            System.out.println("Press Enter to continue...");
-            sc.nextLine();
-            return;
-        }
-        
-        // Pre-filter to only show projects that are open for application
-        Date currentDate = new Date();
-        eligibleProjects.removeIf(p -> !p.isOpenForApplication());
-        
-        if (eligibleProjects.isEmpty()) {
-            System.out.println("No projects are currently open for application.");
-            System.out.println("Press Enter to continue...");
-            sc.nextLine();
-            return;
-        }
-        
-        // Always start with alphabetical sorting by default
-        // This ensures projects are displayed immediately in alphabetical order
-        if (!filterPreferences.containsKey("sortBy")) {
-            filterPreferences.put("sortBy", SORT_BY_ALPHABETICAL);
-        }
-        
-        // Apply current filters and sorting
-        List<Project> filteredProjects = applyFiltersAndSort(eligibleProjects);
-        
-        if (filteredProjects.isEmpty()) {
-            System.out.println("\nNo projects match your filter criteria.");
-            System.out.println("Press Enter to continue...");
-            sc.nextLine();
-            return;
-        }
-        
-        // Display projects
-        displayProjects(filteredProjects);
-        
-        // Project selection submenu
-        System.out.println("\nOptions:");
-        System.out.println("1. View Project Details");
-        System.out.println("2. Filter and Sort Projects");
-        System.out.println("3. Return to Main Menu");
-        
-        System.out.print("\nEnter your choice: ");
-        String choice = sc.nextLine();
-        
-        switch (choice) {
-            case "1":
-                System.out.print("Enter project number to view details: ");
-                try {
-                    int projectIndex = Integer.parseInt(sc.nextLine()) - 1;
-                    if (projectIndex >= 0 && projectIndex < filteredProjects.size()) {
-                        viewProjectDetails(filteredProjects.get(projectIndex));
-                    } else {
-                        System.out.println("Invalid project number. Press Enter to continue.");
+        while (!exitToMain) {
+            ScreenUtil.clearScreen();
+            System.out.println("\n===== Available Projects =====");
+            
+            // Get projects based on applicant's eligibility
+            List<Project> allProjects = projectControl.getAllProjects();
+            List<Project> eligibleProjects = new ArrayList<>();
+            
+            // First filter by visibility and eligibility
+            for (Project project : allProjects) {
+                // Check if project is visible AND applicant is eligible
+                if (project.isVisible() && project.checkEligibility(currentUser, project.getProjectID())) {
+                    eligibleProjects.add(project);
+                }
+            }
+            
+            if (eligibleProjects.isEmpty()) {
+                System.out.println("No eligible projects available for you at this time.");
+                System.out.println("Press Enter to continue...");
+                sc.nextLine();
+                return;
+            }
+            
+            // Pre-filter to only show projects that are open for application
+            Date currentDate = new Date();
+            eligibleProjects.removeIf(p -> !p.isOpenForApplication());
+            
+            if (eligibleProjects.isEmpty()) {
+                System.out.println("No projects are currently open for application.");
+                System.out.println("Press Enter to continue...");
+                sc.nextLine();
+                return;
+            }
+            
+            // Always start with alphabetical sorting by default
+            if (!filterPreferences.containsKey("sortBy")) {
+                filterPreferences.put("sortBy", SORT_BY_ALPHABETICAL);
+            }
+            
+            // Apply current filters and sorting
+            List<Project> filteredProjects = applyFiltersAndSort(eligibleProjects);
+            
+            if (filteredProjects.isEmpty()) {
+                System.out.println("\nNo projects match your filter criteria.");
+                System.out.println("Press Enter to continue...");
+                sc.nextLine();
+                return;
+            }
+            
+            // Display projects
+            displayProjects(filteredProjects);
+            
+            // Project selection submenu
+            System.out.println("\nOptions:");
+            System.out.println("1. View Project Details");
+            System.out.println("2. Filter and Sort Projects");
+            System.out.println("3. Return to Main Menu");
+            
+            System.out.print("\nEnter your choice: ");
+            String choice = sc.nextLine();
+            
+            switch (choice) {
+                case "1":
+                    System.out.print("Enter project number to view details: ");
+                    try {
+                        int projectIndex = Integer.parseInt(sc.nextLine()) - 1;
+                        if (projectIndex >= 0 && projectIndex < filteredProjects.size()) {
+                            viewProjectDetails(filteredProjects.get(projectIndex));
+                        } else {
+                            System.out.println("Invalid project number. Press Enter to continue.");
+                            sc.nextLine();
+                        }
+                    } catch (NumberFormatException e) {
+                        System.out.println("Invalid input. Press Enter to continue.");
                         sc.nextLine();
                     }
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid input. Press Enter to continue.");
+                    break;
+                case "2":
+                    // Show filtering options only when user selects this option
+                    displayFilterOptions(eligibleProjects);
+                    break;
+                case "3":
+                    exitToMain = true;
+                    break;
+                default:
+                    System.out.println("Invalid choice. Press Enter to continue.");
                     sc.nextLine();
+            }
+        }
+    }
+    
+    private void displayFilterOptions(List<Project> eligibleProjects) {
+        System.out.println("\n----- Filter and Sort Options -----");
+        System.out.println("Sort by:");
+        System.out.println("1. Flat Types");
+        System.out.println("2. Neighborhood");
+        System.out.println("3. Closing Date (Earliest first)");
+        System.out.println("4. Alphabetical (Default)");
+        System.out.println("5. Availability (Most units first)");
+        
+        System.out.print("\nEnter sort option (or press Enter to use previous/default): ");
+        String sortOption = sc.nextLine();
+        
+        if (!sortOption.trim().isEmpty()) {
+            filterPreferences.put("sortBy", sortOption);
+        }
+        
+        // Get the current sort method
+        String currentSortMethod = (String) filterPreferences.getOrDefault("sortBy", SORT_BY_ALPHABETICAL);
+        
+        // Neighborhood filtering for Neighborhood sort method
+        if (currentSortMethod.equals(SORT_BY_NEIGHBORHOOD)) {
+            Set<String> availableNeighborhoods = new HashSet<>();
+            for (Project p : eligibleProjects) {
+                availableNeighborhoods.add(p.getNeighborhood());
+            }
+            
+            System.out.println("\nAvailable Neighborhoods:");
+            int index = 1;
+            Map<Integer, String> neighborhoodMap = new HashMap<>();
+            
+            for (String neighborhood : availableNeighborhoods) {
+                System.out.println(index + ". " + neighborhood);
+                neighborhoodMap.put(index, neighborhood);
+                index++;
+            }
+            
+            System.out.print("\nSelect a neighborhood number (0 for all): ");
+            int neighborhoodChoice = 0;
+            try {
+                String input = sc.nextLine();
+                if (!input.trim().isEmpty()) {
+                    neighborhoodChoice = Integer.parseInt(input);
                 }
-                break;
-            case "2":
-                // Show filtering options only when user selects this option
-                displayFilterOptions(eligibleProjects);
-                break;
-            case "3":
-                exitToMain = true;
-                break;
-            default:
-                System.out.println("Invalid choice. Press Enter to continue.");
-                sc.nextLine();
-        }
-    }
-}
-    
-private void displayFilterOptions(List<Project> eligibleProjects) {
-    System.out.println("\n----- Filter and Sort Options -----");
-    System.out.println("Sort by:");
-    System.out.println("1. Flat Types");
-    System.out.println("2. Neighborhood");
-    System.out.println("3. Closing Date (Earliest first)");
-    System.out.println("4. Alphabetical (Default)");
-    System.out.println("5. Availability (Most units first)");
-    
-    System.out.print("\nEnter sort option (or press Enter to use previous/default): ");
-    String sortOption = sc.nextLine();
-    
-    if (!sortOption.trim().isEmpty()) {
-        filterPreferences.put("sortBy", sortOption);
-    }
-    
-    // Get the current sort method
-    String currentSortMethod = (String) filterPreferences.getOrDefault("sortBy", SORT_BY_ALPHABETICAL);
-    
-    // Neighborhood filtering for Neighborhood sort method
-    if (currentSortMethod.equals(SORT_BY_NEIGHBORHOOD)) {
-        Set<String> availableNeighborhoods = new HashSet<>();
-        for (Project p : eligibleProjects) {
-            availableNeighborhoods.add(p.getNeighborhood());
-        }
-        
-        System.out.println("\nAvailable Neighborhoods:");
-        int index = 1;
-        Map<Integer, String> neighborhoodMap = new HashMap<>();
-        
-        for (String neighborhood : availableNeighborhoods) {
-            System.out.println(index + ". " + neighborhood);
-            neighborhoodMap.put(index, neighborhood);
-            index++;
-        }
-        
-        System.out.print("\nSelect a neighborhood number (0 for all): ");
-        int neighborhoodChoice = 0;
-        try {
-            String input = sc.nextLine();
-            if (!input.trim().isEmpty()) {
-                neighborhoodChoice = Integer.parseInt(input);
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid input. Showing all neighborhoods.");
             }
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Showing all neighborhoods.");
-        }
-        
-        if (neighborhoodChoice > 0 && neighborhoodChoice < index) {
-            String selectedNeighborhood = neighborhoodMap.get(neighborhoodChoice);
-            filterPreferences.put("neighborhood", selectedNeighborhood);
-            System.out.println("Filtering by: " + selectedNeighborhood);
-        } else {
-            filterPreferences.remove("neighborhood");
-        }
-    }
-    
-    // Flat type filtering for Flat Type and Availability sort methods
-    if (currentSortMethod.equals(SORT_BY_FLAT_TYPE) || 
-        currentSortMethod.equals(SORT_BY_AVAILABILITY)) {
-        System.out.println("\nSelect Flat Type:");
-        System.out.println("1. 2-Room");
-        System.out.println("2. 3-Room");
-        System.out.println("0. All Types");
-        
-        System.out.print("\nSelect a flat type (0 for all): ");
-        int flatTypeChoice = 0;
-        try {
-            String input = sc.nextLine();
-            if (!input.trim().isEmpty()) {
-                flatTypeChoice = Integer.parseInt(input);
+            
+            if (neighborhoodChoice > 0 && neighborhoodChoice < index) {
+                String selectedNeighborhood = neighborhoodMap.get(neighborhoodChoice);
+                filterPreferences.put("neighborhood", selectedNeighborhood);
+                System.out.println("Filtering by: " + selectedNeighborhood);
+            } else {
+                filterPreferences.remove("neighborhood");
             }
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Showing all flat types.");
         }
         
-        if (flatTypeChoice == 1) {
-            filterPreferences.put("flatType", "2-Room");
-            System.out.println("Filtering by: 2-Room flats");
-        } else if (flatTypeChoice == 2) {
-            filterPreferences.put("flatType", "3-Room");
-            System.out.println("Filtering by: 3-Room flats");
-        } else {
-            filterPreferences.remove("flatType");
+        // Flat type filtering for Flat Type and Availability sort methods
+        if (currentSortMethod.equals(SORT_BY_FLAT_TYPE) || 
+            currentSortMethod.equals(SORT_BY_AVAILABILITY)) {
+            System.out.println("\nSelect Flat Type:");
+            System.out.println("1. 2-Room");
+            System.out.println("2. 3-Room");
+            System.out.println("0. All Types");
+            
+            System.out.print("\nSelect a flat type (0 for all): ");
+            int flatTypeChoice = 0;
+            try {
+                String input = sc.nextLine();
+                if (!input.trim().isEmpty()) {
+                    flatTypeChoice = Integer.parseInt(input);
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid input. Showing all flat types.");
+            }
+            
+            if (flatTypeChoice == 1) {
+                filterPreferences.put("flatType", "2-Room");
+                System.out.println("Filtering by: 2-Room flats");
+            } else if (flatTypeChoice == 2) {
+                filterPreferences.put("flatType", "3-Room");
+                System.out.println("Filtering by: 3-Room flats");
+            } else {
+                filterPreferences.remove("flatType");
+            }
         }
     }
-}
     
-    // First, let's restore and update the applyFiltersAndSort method in ApplicantUI.java
-
     private List<Project> applyFiltersAndSort(List<Project> projects) {
         List<Project> filteredProjects = new ArrayList<>(projects);
         
@@ -453,102 +460,114 @@ private void displayFilterOptions(List<Project> eligibleProjects) {
         }
     }
 
-/**
- * Display the enquiry menu
- */
-private void displayEnquiryMenu() {
-    ScreenUtil.clearScreen();
-    System.out.println("\n===== Enquiry Menu =====");
-    System.out.println("1. Make New Enquiry");
-    System.out.println("2. View My Enquiries");
-    System.out.println("3. Return to Main Menu");
-    
-    System.out.print("\nEnter your choice: ");
-    String choice = sc.nextLine();
-    
-    switch (choice) {
-        case "1":
-            makeEnquiry();
-            break;
-        case "2":
-            viewEnquiries();
-            break;
-        case "3":
-            return;
-        default:
-            System.out.println("Invalid choice. Press Enter to continue.");
-            sc.nextLine();
+    /**
+     * Display the enquiry menu
+     */
+    private void displayEnquiryMenu() {
+        ScreenUtil.clearScreen();
+        System.out.println("\n===== Enquiry Menu =====");
+        System.out.println("1. Make New Enquiry");
+        System.out.println("2. View My Enquiries");
+        System.out.println("3. Return to Main Menu");
+        
+        System.out.print("\nEnter your choice: ");
+        String choice = sc.nextLine();
+        
+        switch (choice) {
+            case "1":
+                makeEnquiry();
+                break;
+            case "2":
+                viewEnquiries();
+                break;
+            case "3":
+                return;
+            default:
+                System.out.println("Invalid choice. Press Enter to continue.");
+                sc.nextLine();
+        }
     }
-}
 
-/**
- * Make a new enquiry
- */
-private void makeEnquiry() {
-    ScreenUtil.clearScreen();
-    System.out.println("\n===== Make New Enquiry =====");
-    
-    // Get visible projects for the applicant
-    List<Project> visibleProjects = projectControl.getVisibleProjectsForUser(currentUser, filterPreferences);
-    
-    if (visibleProjects.isEmpty()) {
-        System.out.println("No projects available for enquiry at this time.");
-        System.out.println("Press Enter to continue...");
-        sc.nextLine();
-        return;
-    }
-    
-    // Display the list of projects
-    System.out.println("Select a project to enquire about:");
-    for (int i = 0; i < visibleProjects.size(); i++) {
-        System.out.println((i + 1) + ". " + visibleProjects.get(i).getProjectName());
-    }
-    
-    System.out.print("\nEnter project number (0 to cancel): ");
-    int projectChoice;
-    try {
-        projectChoice = Integer.parseInt(sc.nextLine());
-        if (projectChoice == 0) {
+    /**
+     * Make a new enquiry
+     */
+    private void makeEnquiry() {
+        ScreenUtil.clearScreen();
+        System.out.println("\n===== Make New Enquiry =====");
+        
+        // Get visible projects for the applicant
+        List<Project> allProjects = projectControl.getAllProjects();
+        List<Project> visibleProjects = new ArrayList<>();
+        
+        // Filter for visible projects that the applicant is eligible for
+        for (Project project : allProjects) {
+            if (project.isVisible() && project.checkEligibility(currentUser, project.getProjectID())) {
+                visibleProjects.add(project);
+            }
+        }
+        
+        if (visibleProjects.isEmpty()) {
+            System.out.println("No projects available for enquiry at this time.");
+            System.out.println("Press Enter to continue...");
+            sc.nextLine();
             return;
         }
         
-        if (projectChoice < 1 || projectChoice > visibleProjects.size()) {
-            System.out.println("Invalid project number. Press Enter to continue.");
+        // Display the list of projects
+        System.out.println("Select a project to enquire about:");
+        for (int i = 0; i < visibleProjects.size(); i++) {
+            System.out.println((i + 1) + ". " + visibleProjects.get(i).getProjectName());
+        }
+        
+        System.out.print("\nEnter project number (0 to cancel): ");
+        int projectChoice;
+        try {
+            projectChoice = Integer.parseInt(sc.nextLine());
+            if (projectChoice == 0) {
+                return;
+            }
+            
+            if (projectChoice < 1 || projectChoice > visibleProjects.size()) {
+                System.out.println("Invalid project number. Press Enter to continue.");
+                sc.nextLine();
+                return;
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid input. Press Enter to continue.");
             sc.nextLine();
             return;
         }
-    } catch (NumberFormatException e) {
-        System.out.println("Invalid input. Press Enter to continue.");
+        
+        Project selectedProject = visibleProjects.get(projectChoice - 1);
+        
+        // Get enquiry content
+        System.out.println("\nEnter your enquiry about " + selectedProject.getProjectName() + ":");
+        String content = sc.nextLine();
+        
+        if (content.trim().isEmpty()) {
+            System.out.println("Enquiry cannot be empty. Press Enter to continue.");
+            sc.nextLine();
+            return;
+        }
+        
+        // Create and submit the enquiry
+        EnquiryControl enquiryControl = new EnquiryControl();
+        Enquiry enquiry = enquiryControl.submitEnquiry(currentUser, selectedProject, content);
+        
+        if (enquiry != null) {
+            System.out.println("\nEnquiry submitted successfully!");
+            System.out.println("Enquiry ID: " + enquiry.getEnquiryID());
+        } else {
+            System.out.println("\nFailed to submit enquiry. Please try again later.");
+        }
+        
+        System.out.println("Press Enter to continue...");
         sc.nextLine();
-        return;
     }
+
     
-    Project selectedProject = visibleProjects.get(projectChoice - 1);
     
-    // Get enquiry content
-    System.out.println("\nEnter your enquiry about " + selectedProject.getProjectName() + ":");
-    String content = sc.nextLine();
-    
-    if (content.trim().isEmpty()) {
-        System.out.println("Enquiry cannot be empty. Press Enter to continue.");
-        sc.nextLine();
-        return;
-    }
-    
-    // Create and submit the enquiry
-    EnquiryControl enquiryControl = new EnquiryControl();
-    Enquiry enquiry = enquiryControl.submitEnquiry(currentUser, selectedProject, content);
-    
-    if (enquiry != null) {
-        System.out.println("\nEnquiry submitted successfully!");
-        System.out.println("Enquiry ID: " + enquiry.getEnquiryID());
-    } else {
-        System.out.println("\nFailed to submit enquiry. Please try again later.");
-    }
-    
-    System.out.println("Press Enter to continue...");
-    sc.nextLine();
-}
+  
 
 /**
  * View all enquiries made by the applicant
@@ -773,7 +792,7 @@ private void deleteEnquiry(List<Enquiry> enquiries) {
     }
 }
 
-    /**
+   /**
      * Truncate a string to a maximum length
      * @param str the string to truncate
      * @param maxLength the maximum length
@@ -1511,11 +1530,20 @@ private void deleteEnquiry(List<Enquiry> enquiries) {
         System.out.println("Marital Status: " + currentUser.getMaritalStatusDisplayValue());
         System.out.println("Role: " + currentUser.getRole());
         
-        // Show booked flat if any
-        Flat bookedFlat = currentUser.getBookedFlat();
-        if (bookedFlat != null) {
+        List<Application> applications = currentUser.getApplications();
+        Application bookedApplication = null;
+
+        for (Application app : applications) {
+            if (app.getStatus() == ApplicationStatus.BOOKED) {
+                bookedApplication = app;
+                break;
+            }
+        }
+
+        if (bookedApplication != null && bookedApplication.getBookedFlat() != null) {
+            Flat bookedFlat = bookedApplication.getBookedFlat();
             System.out.println("\nBooked Flat Information:");
-            System.out.println("Project: " + bookedFlat.getProject().getProjectName());
+            System.out.println("Project: " + bookedApplication.getProject().getProjectName());
             System.out.println("Flat Type: " + bookedFlat.getType().getDisplayValue());
             System.out.println("Flat ID: " + bookedFlat.getFlatID());
         } else {

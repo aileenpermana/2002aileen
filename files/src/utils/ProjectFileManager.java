@@ -178,107 +178,114 @@ public class ProjectFileManager {
     }
     
     /**
-     * Parse a project from a CSV line
-     * @param line the CSV line
-     * @return the parsed Project object
-     */
-    private Project parseProjectFromCSV(String line) {
-        try {
-            String[] fields = line.split(",");
-            
-            if (fields.length < 13) {
-                System.out.println("Invalid project record (not enough fields): " + line);
-                return null;
-            }
-            
-            // Extract project ID (first field)
-            String projectID = fields[0].trim();
-            
-            // Extract basic project details
-            String projectName = fields[1].trim();
-            String neighborhood = fields[2].trim();
-            
-            // Parse flat types and units
-            Map<FlatType, Integer> totalUnits = new HashMap<>();
-            if (fields[3].equals("2-Room") && !fields[4].isEmpty()) {
-                try {
-                    totalUnits.put(FlatType.TWO_ROOM, Integer.parseInt(fields[4]));
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid number format for 2-Room units: " + fields[4]);
-                }
-            }
-            
-            if (fields[6].equals("3-Room") && !fields[7].isEmpty()) {
-                try {
-                    totalUnits.put(FlatType.THREE_ROOM, Integer.parseInt(fields[7]));
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid number format for 3-Room units: " + fields[7]);
-                }
-            }
-            
-            // Parse dates with error handling
-            Date openDate;
-            Date closeDate;
-            try {
-                openDate = DATE_FORMAT.parse(fields[9]);
-                closeDate = DATE_FORMAT.parse(fields[10]);
-            } catch (ParseException e) {
-                System.out.println("Error parsing dates in project record: " + e.getMessage());
-                return null;
-            }
-            
-            // Find manager by NRIC
-            String managerNRIC = fields[11].trim();
-            HDBManager manager = findManagerByNRIC(managerNRIC);
-            if (manager == null) {
-                // If not found, create temporary placeholder
-                manager = new HDBManager("Manager", managerNRIC, "password", 30, "MARRIED", "HDBManager");
-            }
-            
-            // Parse officer slots with error handling
-            int officerSlots;
-            try {
-                officerSlots = Integer.parseInt(fields[12]);
-            } catch (NumberFormatException e) {
-                System.out.println("Invalid number format for officer slots: " + fields[12]);
-                officerSlots = 5; // Default value
-            }
-
-            // Parse officer NRICs (last column)
-
-            
-            // Use the provided project ID instead of generating a new one
-            Project project = new Project(
-                projectID,
-                projectName,
-                neighborhood,
-                totalUnits,
-                openDate,
-                closeDate,
-                manager,
-                officerSlots
-            );
-            
-            if (fields.length > 13 && !fields[13].trim().isEmpty()) {
-                String[] officerNRICs = fields[13].trim().split(";");
-                for (String nric : officerNRICs) {
-                    HDBOfficer officer = findOrCreateOfficer(nric.trim());
-                    project.addOfficer(officer);
-                }
-            }
-
-            // Set project visibility (default true)
-            project.setVisible(true);
-            
-            return project;
-            
-        } catch (Exception e) {
-            System.out.println("Error parsing project record: " + e.getMessage());
-            e.printStackTrace();
+ * Parse a project from a CSV line
+ * @param line the CSV line
+ * @return the parsed Project object
+ */
+private Project parseProjectFromCSV(String line) {
+    try {
+        String[] fields = line.split(",");
+        
+        if (fields.length < 13) {
+            System.out.println("Invalid project record (not enough fields): " + line);
             return null;
         }
+        
+        // Extract project ID (first field)
+        String projectID = fields[0].trim();
+        
+        // Extract basic project details
+        String projectName = fields[1].trim();
+        String neighborhood = fields[2].trim();
+        
+        // Parse flat types and units
+        Map<FlatType, Integer> totalUnits = new HashMap<>();
+        if (fields[3].equals("2-Room") && !fields[4].isEmpty()) {
+            try {
+                totalUnits.put(FlatType.TWO_ROOM, Integer.parseInt(fields[4]));
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid number format for 2-Room units: " + fields[4]);
+            }
+        }
+        
+        if (fields[6].equals("3-Room") && !fields[7].isEmpty()) {
+            try {
+                totalUnits.put(FlatType.THREE_ROOM, Integer.parseInt(fields[7]));
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid number format for 3-Room units: " + fields[7]);
+            }
+        }
+        
+        // Parse dates with error handling
+        Date openDate;
+        Date closeDate;
+        try {
+            openDate = DATE_FORMAT.parse(fields[9]);
+            closeDate = DATE_FORMAT.parse(fields[10]);
+        } catch (ParseException e) {
+            System.out.println("Error parsing dates in project record: " + e.getMessage());
+            return null;
+        }
+        
+        // Find manager by NRIC
+        String managerNRIC = fields[11].trim();
+        HDBManager manager = findManagerByNRIC(managerNRIC);
+        if (manager == null) {
+            // If not found, create temporary placeholder
+            manager = new HDBManager("Manager", managerNRIC, "password", 30, "MARRIED", "HDBManager");
+        }
+        
+        // Parse officer slots with error handling
+        int officerSlots;
+        try {
+            officerSlots = Integer.parseInt(fields[12]);
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid number format for officer slots: " + fields[12]);
+            officerSlots = 5; // Default value
+        }
+        
+        // Create the project using the provided ID
+        Project project = new Project(
+            projectID,
+            projectName,
+            neighborhood,
+            totalUnits,
+            openDate,
+            closeDate,
+            manager,
+            officerSlots
+        );
+        
+        // Parse officer NRICs if present
+        if (fields.length > 13 && !fields[13].trim().isEmpty()) {
+            String[] officerNRICs = fields[13].trim().split(";");
+            for (String nric : officerNRICs) {
+                HDBOfficer officer = findOrCreateOfficer(nric.trim());
+                project.addOfficer(officer);
+            }
+        }
+        
+        // Set project visibility - default to true, unless visibility is explicitly set to false
+        boolean isVisible = true;
+        if (fields.length > 14) {
+            try {
+                isVisible = Boolean.parseBoolean(fields[14].trim());
+            } catch (Exception e) {
+                // If there's any issue parsing, default to visible
+                isVisible = true;
+            }
+        }
+        
+        project.setVisible(isVisible);
+        
+        return project;
+        
+    } catch (Exception e) {
+        System.out.println("Error parsing project record: " + e.getMessage());
+        e.printStackTrace();
+        return null;
     }
-    
+}    
     private HDBManager findManagerByNRIC(String nric) {
         try (Scanner scanner = new Scanner(new File("files/resources/ManagerList.csv"))) {
             // Skip header
@@ -325,10 +332,10 @@ public class ProjectFileManager {
         }
         
         try (FileWriter fw = new FileWriter(FILE_PATH)) {
-            // Write header
+            // Write header with Visibility column
             fw.write("ProjectID,Project Name,Neighborhood,Type 1,Number of units for Type 1,Selling price for Type 1," +
                      "Type 2,Number of units for Type 2,Selling price for Type 2," +
-                     "Application opening date,Application closing date,Manager,Officer Slot,Officer\n");
+                     "Application opening date,Application closing date,Manager,Officer Slot,Officer,Visibility\n");
             
             // Write projects
             for (Project project : projects) {
@@ -343,52 +350,55 @@ public class ProjectFileManager {
     }
     
     /**
-     * Format a project as a CSV line
-     * @param project the project to format
-     * @return formatted CSV line
-     */
-    private String formatProjectForCSV(Project project) {
-        StringBuilder sb = new StringBuilder();
-        
-        // Project ID
-        sb.append(project.getProjectID()).append(",");
-        
-        // Project Name
-        sb.append(project.getProjectName()).append(",");
-        
-        // Neighborhood
-        sb.append(project.getNeighborhood()).append(",");
-        
-        // Flat Types
-        // Type 1 (2-Room)
-        sb.append("2-Room").append(",");
-        sb.append(project.getTotalUnitsByType(FlatType.TWO_ROOM)).append(",");
-        sb.append("0").append(","); // Placeholder for selling price
-        
-        // Type 2 (3-Room)
-        sb.append("3-Room").append(",");
-        sb.append(project.getTotalUnitsByType(FlatType.THREE_ROOM)).append(",");
-        sb.append("0").append(","); // Placeholder for selling price
-        
-        // Dates
-        sb.append(DATE_FORMAT.format(project.getApplicationOpenDate())).append(",");
-        sb.append(DATE_FORMAT.format(project.getApplicationCloseDate())).append(",");
-        
-        // Manager
-        sb.append(project.getManagerInCharge().getNRIC()).append(",");
-        
-        // Officer Slots
-        sb.append(project.getAvailableOfficerSlots()).append(",");
-        
-        // Officers 
-        List<String> officerNRICs = new ArrayList<>();
-        for (HDBOfficer officer : project.getOfficers()) {
-            officerNRICs.add(officer.getNRIC());
-        }
-        sb.append(String.join(";", officerNRICs));
-        
-        return sb.toString();
+ * Format a project as a CSV line
+ * @param project the project to format
+ * @return formatted CSV line
+ */
+private String formatProjectForCSV(Project project) {
+    StringBuilder sb = new StringBuilder();
+    
+    // Project ID
+    sb.append(project.getProjectID()).append(",");
+    
+    // Project Name
+    sb.append(project.getProjectName()).append(",");
+    
+    // Neighborhood
+    sb.append(project.getNeighborhood()).append(",");
+    
+    // Flat Types
+    // Type 1 (2-Room)
+    sb.append("2-Room").append(",");
+    sb.append(project.getTotalUnitsByType(FlatType.TWO_ROOM)).append(",");
+    sb.append("0").append(","); // Placeholder for selling price
+    
+    // Type 2 (3-Room)
+    sb.append("3-Room").append(",");
+    sb.append(project.getTotalUnitsByType(FlatType.THREE_ROOM)).append(",");
+    sb.append("0").append(","); // Placeholder for selling price
+    
+    // Dates
+    sb.append(DATE_FORMAT.format(project.getApplicationOpenDate())).append(",");
+    sb.append(DATE_FORMAT.format(project.getApplicationCloseDate())).append(",");
+    
+    // Manager
+    sb.append(project.getManagerInCharge().getNRIC()).append(",");
+    
+    // Officer Slots
+    sb.append(project.getAvailableOfficerSlots()).append(",");
+    
+    // Officers 
+    List<String> officerNRICs = new ArrayList<>();
+    for (HDBOfficer officer : project.getOfficers()) {
+        officerNRICs.add(officer.getNRIC());
     }
+    sb.append(String.join(";", officerNRICs));
+    
+    // Visibility status
+    sb.append(",").append(project.isVisible());
+    
+    return sb.toString();
+}
     
     /**
      * Add a new project to the CSV file

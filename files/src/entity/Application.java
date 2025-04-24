@@ -50,6 +50,10 @@ public class Application {
     public String getApplicationID() {
         return applicationID;
     }
+
+    public void setStatusUpdateDate(Date date) {
+        this.statusUpdateDate = date;
+    }
     
     /**
      * Get applicant
@@ -124,12 +128,8 @@ public class Application {
         return status == ApplicationStatus.SUCCESSFUL && bookedFlat == null;
     }
     
-    /**
-     * Check if this application can be withdrawn
-     * @return true if can withdraw, false otherwise
-     */
     public boolean canWithdraw() {
-        // Can withdraw if pending, successful, or even booked (though might have penalties)
+        // Can withdraw if pending, successful, or booked
         return status == ApplicationStatus.PENDING || 
                status == ApplicationStatus.SUCCESSFUL || 
                status == ApplicationStatus.BOOKED;
