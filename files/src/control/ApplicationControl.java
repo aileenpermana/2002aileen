@@ -94,20 +94,38 @@ private Applicant findOrCreateApplicant(String nric) {
     return (Applicant) UserDataLookup.createFallbackUser(nric, "Applicant");
 }
 
-    public boolean withdrawApplication(Application application) {
-        if (!application.canWithdraw()) {
-            return false;
-        }
-        
-        application.setStatus(ApplicationStatus.WITHDRAW);
-        application.setStatusUpdateDate(new Date());
-        boolean success = updateApplication(application);
-        if (success) {
-            saveApplications();
-        }
-        
-        return success;
+public boolean withdrawApplication(Application application) {
+    if (!application.canWithdraw()) {
+        return false;
     }
+    
+    // Store the original status for later use
+    ApplicationStatus originalStatus = application.getStatus();
+    
+    // Update the application status to withdrawal requested
+    application.setStatus(ApplicationStatus.WITHDRAW);
+    application.setStatusUpdateDate(new Date());
+    
+    // If this is a BOOKED application, we need to capture the flat info for logging purposes
+    String bookedFlatInfo = "";
+    if (originalStatus == ApplicationStatus.BOOKED && application.getBookedFlat() != null) {
+        Flat bookedFlat = application.getBookedFlat();
+        bookedFlatInfo = String.format("Flat [ID: %s, Type: %s]", 
+                                     bookedFlat.getFlatID(), 
+                                     bookedFlat.getType().getDisplayValue());
+        
+        System.out.println("Withdrawal requested for booked flat: " + bookedFlatInfo);
+    }
+    
+    boolean success = updateApplication(application);
+    if (success) {
+        System.out.println("Application status updated to WITHDRAW. Original status: " + originalStatus);
+        saveApplications();
+    }
+    
+    return success;
+}
+
     
     
     
@@ -558,46 +576,44 @@ private Applicant findOrCreateApplicant(String nric) {
                 try {
                     java.nio.file.Files.copy(existingFile.toPath(), new File(backupFile).toPath(), 
                                      java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    System.out.println("Backup created: " + backupFile);
                 } catch (Exception e) {
                     System.err.println("Warning: Could not create backup: " + e.getMessage());
                 }
             }
             
-            try (PrintWriter writer = new PrintWriter(new FileWriter("files/resources/ApplicationList.csv"))) {
+            System.out.println("Saving " + applications.size() + " applications to " + APPLICATIONS_FILE);
+            
+            try (PrintWriter writer = new PrintWriter(new FileWriter(APPLICATIONS_FILE))) {
                 // Write header
                 writer.println("ApplicationID,ApplicantNRIC,ProjectID,Status,ApplicationDate,StatusUpdateDate,BookedFlatID");
                 
-                // Log what's being saved for debugging
-                System.out.println("Saving " + applications.size() + " applications to " + "files/resources/ApplicationList.csv");
-                
                 // Write applications - Make sure status is properly saved
                 for (Application app : applications) {
-                    // Create a debug string to log what we're writing
+                    // Create a debug string to log special statuses
                     if (app.getStatus() == ApplicationStatus.WITHDRAW || 
                         app.getStatus() == ApplicationStatus.UNSUCCESSFUL) {
-                        
+                        System.out.println("Saving application with status: " + app.getStatus() + 
+                                         " - ID: " + app.getApplicationID());
                     }
                     
-                    writer.print(
-                        app.getApplicationID() + "," +
-                        app.getApplicant().getNRIC() + "," +
-                        app.getProject().getProjectID() + "," +
-                        app.getStatus() + "," + // This saves the enum name correctly
-                        app.getApplicationDate().getTime() + "," +
-                        app.getStatusUpdateDate().getTime()
-                    );
+                    StringBuilder sb = new StringBuilder();
+                    sb.append(app.getApplicationID()).append(",");
+                    sb.append(app.getApplicant().getNRIC()).append(",");
+                    sb.append(app.getProject().getProjectID()).append(",");
+                    sb.append(app.getStatus()).append(","); // Save enum name
+                    sb.append(app.getApplicationDate().getTime()).append(",");
+                    sb.append(app.getStatusUpdateDate().getTime());
                     
                     // Add booked flat ID if any
                     if (app.getBookedFlat() != null) {
-                        writer.print("," + app.getBookedFlat().getFlatID());
+                        sb.append(",").append(app.getBookedFlat().getFlatID());
                     }
                     
-                    writer.println();
+                    writer.println(sb.toString());
                 }
                 
-                
-                
-                
+                System.out.println("Applications saved successfully.");
                 return true;
             }
         } catch (IOException e) {
@@ -605,7 +621,7 @@ private Applicant findOrCreateApplicant(String nric) {
             e.printStackTrace(); // Print full stack trace for debugging
             return false;
         }
-    } //
+    }
     
     /**
      * Save withdrawal requests to file

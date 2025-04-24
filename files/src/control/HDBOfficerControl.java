@@ -601,58 +601,82 @@ private boolean addUserToOfficerFile(HDBOfficer officer) {
     public boolean bookFlatForApplicant(HDBOfficer officer, Application application, FlatType flatType) {
         // Validate input
         if (officer == null || application == null || flatType == null) {
+            System.out.println("Invalid inputs for booking");
             return false;
         }
-
+    
         // Check if the officer is handling this project
         Project project = application.getProject();
         if (!officer.isHandlingProject(project)) {
+            System.out.println("Officer is not handling this project");
             return false;
         }
-
+    
         // Check application status
         if (application.getStatus() != ApplicationStatus.SUCCESSFUL) {
+            System.out.println("Application not in SUCCESSFUL state");
             return false;
         }
-
+    
         // Check if the project has available units of the specified flat type
-        if (project.getAvailableUnitsByType(flatType) <= 0) {
+        int availableUnits = project.getAvailableUnitsByType(flatType);
+        System.out.println("Available units before booking: " + availableUnits);
+        
+        if (availableUnits <= 0) {
+            System.out.println("No available units of type: " + flatType.getDisplayValue());
             return false;
         }
-
+    
         // Validate applicant's eligibility for this flat type
         Applicant applicant = application.getApplicant();
         if (!isApplicantEligibleForFlatType(applicant, flatType, project)) {
+            System.out.println("Applicant not eligible for this flat type");
             return false;
         }
-
+    
         // Generate a new Flat object
         String flatID = generateFlatID(project, flatType);
         Flat bookedFlat = new Flat(flatID, project, flatType);
-
+        System.out.println("Generated flat ID: " + flatID);
+    
         // Update project's available units
-        project.decrementAvailableUnits(flatType);
-
+        boolean decrementSuccess = project.decrementAvailableUnits(flatType);
+        if (!decrementSuccess) {
+            System.out.println("Failed to decrement available units");
+            return false;
+        }
+        
+        System.out.println("Available units after decrement: " + project.getAvailableUnitsByType(flatType));
+    
         // Update application status to BOOKED
         application.setStatus(ApplicationStatus.BOOKED);
         application.setBookedFlat(bookedFlat);
-
+    
         // Update applicant's booked flat
         applicant.setBookedFlat(bookedFlat);
-
+    
         // Save changes
         ApplicationControl applicationControl = new ApplicationControl();
         boolean applicationSaved = applicationControl.updateApplication(application);
         
+        if (applicationSaved) {
+            System.out.println("Application updated successfully");
+            applicationControl.saveApplications();
+        } else {
+            System.out.println("Failed to update application");
+        }
+        
         // Update project units and save to CSV
         ProjectControl projectControl = new ProjectControl();
         boolean projectUnitsUpdated = projectControl.updateProjectUnitsAfterBooking(project, flatType);
-
+        
+        System.out.println("Project units updated: " + projectUnitsUpdated);
+    
         // Generate receipt
         if (applicationSaved && projectUnitsUpdated) {
             return true;
         }
-
+    
         return false;
     }
 

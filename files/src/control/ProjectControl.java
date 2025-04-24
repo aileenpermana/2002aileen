@@ -128,26 +128,25 @@ public class ProjectControl {
         return managerProjects;
     }
 
-    /**
- * Update project units after a flat booking
- * @param project the project being updated
- * @param flatType the type of flat being booked
- * @return true if update was successful, false otherwise
- */
     public boolean updateProjectUnitsAfterBooking(Project project, FlatType flatType) {
         try {
-            // Decrement available units for the specific flat type
-            boolean decrementSuccessful = project.decrementAvailableUnits(flatType);
+            // Log the operation to help debugging
+            System.out.println("Updating project units after booking:");
+            System.out.println("Project: " + project.getProjectName());
+            System.out.println("Flat type: " + flatType.getDisplayValue());
+            System.out.println("Available units before update: " + project.getAvailableUnitsByType(flatType));
             
-            if (!decrementSuccessful) {
-                System.err.println("Could not decrement units for project: " + project.getProjectName());
-                return false;
-            }
+            // We don't need to decrement here because it's already done in HDBOfficerControl.bookFlatForApplicant
+            // Just save the updated project to the file
+            boolean saveSuccess = fileManager.updateProject(project);
             
-            // Save the updated project to CSV
-            return fileManager.updateProject(project);
+            System.out.println("Available units after update: " + project.getAvailableUnitsByType(flatType));
+            System.out.println("Save success: " + saveSuccess);
+            
+            return saveSuccess;
         } catch (Exception e) {
             System.err.println("Error updating project units: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }
