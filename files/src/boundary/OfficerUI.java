@@ -297,21 +297,15 @@ public class OfficerUI {
         while (!done) {
             ScreenUtil.clearScreen();
             System.out.println("\n===== Flat Booking for " + selectedProject.getProjectName() + " =====");
-            System.out.println("1. Update Available Flats");
-            System.out.println("2. Retrieve Applicant's Application");
-            System.out.println("3. Book Flat for Applicant");
-            System.out.println("4. Generate Receipt");
-            System.out.println("5. Return to Main Menu");
+            System.out.println("1. Book Flat for Applicant");
+            System.out.println("2. Return to Main Menu");
             
             System.out.print("\nEnter your choice: ");
             String choice = sc.nextLine();
             
             switch (choice) {
-                case "1" -> updateAvailableFlats(selectedProject);
-                case "2" -> retrieveApplication(selectedProject);
-                case "3" -> bookFlat(selectedProject);
-                case "4" -> generateReceipt(selectedProject);
-                case "5" -> done = true;
+                case "1" -> bookFlat(selectedProject);
+                case "2" -> done = true;
                 default -> {
                     System.out.println("Invalid choice. Press Enter to continue.");
                     sc.nextLine();
@@ -320,84 +314,15 @@ public class OfficerUI {
         }
     }
     
-    /**
-     * Update the number of available flats
-     * @param project the project to update
-     */
-    private void updateAvailableFlats(Project project) {
-        ScreenUtil.clearScreen();
-        System.out.println("\n===== Update Available Flats =====");
-        System.out.println("Project: " + project.getProjectName());
-        
-        System.out.println("\nCurrent Flat Availability:");
-        for (FlatType type : project.getFlatTypes()) {
-            System.out.println(type.getDisplayValue() + ": " + 
-                             project.getAvailableUnitsByType(type) + " units available out of " + 
-                             project.getTotalUnitsByType(type));
-        }
-        
-        System.out.println("\nSelect flat type to update:");
-        List<FlatType> flatTypes = new ArrayList<>(project.getFlatTypes());        for (int i = 0; i < flatTypes.size(); i++) {
-            System.out.println((i + 1) + ". " + flatTypes.get(i).getDisplayValue());
-        }
-        
-        System.out.print("\nEnter flat type number (0 to cancel): ");
-        int typeChoice;
-        try {
-            typeChoice = Integer.parseInt(sc.nextLine());
-            if (typeChoice == 0) {
-                return;
-            }
-            
-            if (typeChoice < 1 || typeChoice > flatTypes.size()) {
-                System.out.println("Invalid flat type number. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Press Enter to continue.");
-            sc.nextLine();
-            return;
-        }
-        
-        FlatType selectedType = flatTypes.get(typeChoice - 1);
-        int currentAvailable = project.getAvailableUnitsByType(selectedType);
-        int totalUnits = project.getTotalUnitsByType(selectedType);
-        
-        System.out.println("\nCurrent available " + selectedType.getDisplayValue() + " units: " + currentAvailable);
-        System.out.print("Enter new available count (0-" + totalUnits + "): ");
-        
-        try {
-            int newCount = Integer.parseInt(sc.nextLine());
-            if (newCount < 0 || newCount > totalUnits) {
-                System.out.println("Invalid count. Must be between 0 and " + totalUnits);
-                System.out.println("Press Enter to continue...");
-                sc.nextLine();
-                return;
-            }
-            
-            // Update the available units
-            currentUser.updateFlatAvailability(project, selectedType, newCount);
-            System.out.println("Available units updated successfully!");
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Press Enter to continue.");
-        }
-        
-        System.out.println("Press Enter to continue...");
-        sc.nextLine();
-    }
     
-    /**
-     * Retrieve an applicant's application
-     * @param project the project
-     */
-    private void retrieveApplication(Project project) {
+    private void bookFlat(Project project) {
         ScreenUtil.clearScreen();
-        System.out.println("\n===== Retrieve Applicant's Application =====");
+        System.out.println("\n===== Book Flat for Applicant =====");
         System.out.println("Project: " + project.getProjectName());
         
+        // Step 1: Get the applicant's NRIC
         System.out.print("Enter applicant's NRIC: ");
-        String nric = sc.nextLine();
+        String nric = sc.nextLine().trim().toUpperCase();
         
         if (nric.isEmpty()) {
             System.out.println("Operation cancelled.");
@@ -406,335 +331,128 @@ public class OfficerUI {
             return;
         }
         
-        Application application = currentUser.retrieveApplicationByNRIC(nric, project);
-        
-        if (application == null) {
-            System.out.println("No application found for NRIC: " + nric);
+        // Validate NRIC format
+        if (!nric.matches("[STst]\\d{7}[A-Za-z]")) {
+            System.out.println("Invalid NRIC format. It should start with S or T, followed by 7 digits, and end with a letter.");
             System.out.println("Press Enter to continue...");
             sc.nextLine();
             return;
         }
         
-        // Display application details
-        SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
-        System.out.println("\nApplication Details:");
-        System.out.println("Application ID: " + application.getApplicationID());
-        System.out.println("Applicant: " + application.getApplicant().getName());
-        System.out.println("NRIC: " + application.getApplicant().getNRIC());
-        System.out.println("Status: " + application.getStatus().getDisplayValue());
-        System.out.println("Application Date: " + dateFormat.format(application.getApplicationDate()));
-        
-        if (application.getStatus() == ApplicationStatus.BOOKED) {
-            System.out.println("\nThis application already has a booked flat.");
-        }
-        
-        System.out.println("\nPress Enter to continue...");
-        sc.nextLine();
-    }
-    
-    /**
-     * Book a flat for an applicant
-     * @param project the project
-     */
-    /**
- * Enhanced bookFlat method for OfficerUI class
- */
-private void bookFlat(Project project) {
-    ScreenUtil.clearScreen();
-    System.out.println("\n===== Book Flat for Applicant =====");
-    System.out.println("Project: " + project.getProjectName());
-    
-    // Step 1: Get the applicant's NRIC
-    System.out.print("Enter applicant's NRIC: ");
-    String nric = sc.nextLine().trim().toUpperCase();
-    
-    if (nric.isEmpty()) {
-        System.out.println("Operation cancelled.");
-        System.out.println("Press Enter to continue...");
-        sc.nextLine();
-        return;
-    }
-    
-    // Validate NRIC format
-    if (!nric.matches("[STst]\\d{7}[A-Za-z]")) {
-        System.out.println("Invalid NRIC format. It should start with S or T, followed by 7 digits, and end with a letter.");
-        System.out.println("Press Enter to continue...");
-        sc.nextLine();
-        return;
-    }
-    
-    // Step 2: Find the application
-    HDBOfficerControl officerControl = new HDBOfficerControl();
-    Application application = officerControl.findApplicationByNRIC(nric, project);
-    
-    if (application == null) {
-        System.out.println("No application found for NRIC: " + nric + " in project " + project.getProjectName());
-        System.out.println("Press Enter to continue...");
-        sc.nextLine();
-        return;
-    }
-    
-    // Step 3: Validate application status
-    if (application.getStatus() != ApplicationStatus.SUCCESSFUL) {
-        System.out.println("This application is not in 'Successful' status and cannot be booked.");
-        System.out.println("Current status: " + application.getStatus().getDisplayValue());
-        System.out.println("Press Enter to continue...");
-        sc.nextLine();
-        return;
-    }
-    
-    if (application.getBookedFlat() != null) {
-        System.out.println("This application already has a booked flat.");
-        System.out.println("Flat ID: " + application.getBookedFlat().getFlatID());
-        System.out.println("Press Enter to continue...");
-        sc.nextLine();
-        return;
-    }
-    
-    // Step 4: Verify applicant eligibility
-    Applicant applicant = application.getApplicant();
-    boolean isEligible = true;
-    String eligibilityMessage = "";
-    
-    // Check age and marital status
-    if (applicant.getMaritalStatus() == MaritalStatus.SINGLE) {
-        if (applicant.getAge() < 35) {
-            isEligible = false;
-            eligibilityMessage = "Single applicants must be 35 years or older.";
-        }
-    } else if (applicant.getMaritalStatus() == MaritalStatus.MARRIED) {
-        if (applicant.getAge() < 21) {
-            isEligible = false;
-            eligibilityMessage = "Married applicants must be 21 years or older.";
-        }
-    }
-    
-    if (!isEligible) {
-        System.out.println("Applicant is not eligible: " + eligibilityMessage);
-        System.out.println("Press Enter to continue...");
-        sc.nextLine();
-        return;
-    }
-    
-    // Step 5: Display applicant and application details
-    ScreenUtil.clearScreen();
-    SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
-    
-    System.out.println("\n===== Applicant Details =====");
-    System.out.println("Name: " + applicant.getName());
-    System.out.println("NRIC: " + applicant.getNRIC());
-    System.out.println("Age: " + applicant.getAge());
-    System.out.println("Marital Status: " + applicant.getMaritalStatusDisplayValue());
-    
-    System.out.println("\n===== Application Details =====");
-    System.out.println("Application ID: " + application.getApplicationID());
-    System.out.println("Application Date: " + dateFormat.format(application.getApplicationDate()));
-    System.out.println("Status: " + application.getStatus().getDisplayValue());
-    
-    // Step 6: Determine available flat types based on eligibility
-    List<FlatType> availableFlatTypes = new ArrayList<>();
-    
-    if (applicant.getMaritalStatus() == MaritalStatus.SINGLE) {
-        // Singles can only apply for 2-Room
-        if (project.hasFlatType(FlatType.TWO_ROOM) && project.getAvailableUnitsByType(FlatType.TWO_ROOM) > 0) {
-            availableFlatTypes.add(FlatType.TWO_ROOM);
-        }
-    } else {
-        // Married couples can apply for any flat type
-        if (project.hasFlatType(FlatType.TWO_ROOM) && project.getAvailableUnitsByType(FlatType.TWO_ROOM) > 0) {
-            availableFlatTypes.add(FlatType.TWO_ROOM);
-        }
-        if (project.hasFlatType(FlatType.THREE_ROOM) && project.getAvailableUnitsByType(FlatType.THREE_ROOM) > 0) {
-            availableFlatTypes.add(FlatType.THREE_ROOM);
-        }
-    }
-    
-    if (availableFlatTypes.isEmpty()) {
-        System.out.println("\nNo available flats for eligible types in this project.");
-        System.out.println("Press Enter to continue...");
-        sc.nextLine();
-        return;
-    }
-    
-    // Step 7: Display available flat types
-    System.out.println("\n===== Available Flat Types =====");
-    for (int i = 0; i < availableFlatTypes.size(); i++) {
-        FlatType type = availableFlatTypes.get(i);
-        System.out.println((i + 1) + ". " + type.getDisplayValue() + 
-                         " (" + project.getAvailableUnitsByType(type) + " units available)");
-    }
-    
-    // Step 8: Select flat type
-    System.out.print("\nSelect flat type (0 to cancel): ");
-    int typeChoice;
-    try {
-        typeChoice = Integer.parseInt(sc.nextLine());
-        if (typeChoice == 0) {
-            System.out.println("Booking cancelled.");
-            System.out.println("Press Enter to continue...");
-            sc.nextLine();
-            return;
-        }
-        
-        if (typeChoice < 1 || typeChoice > availableFlatTypes.size()) {
-            System.out.println("Invalid choice. Booking cancelled.");
-            System.out.println("Press Enter to continue...");
-            sc.nextLine();
-            return;
-        }
-    } catch (NumberFormatException e) {
-        System.out.println("Invalid input. Booking cancelled.");
-        System.out.println("Press Enter to continue...");
-        sc.nextLine();
-        return;
-    }
-    
-    FlatType selectedType = availableFlatTypes.get(typeChoice - 1);
-    
-    // Step 9: Generate a flat ID
-    String flatID = generateFlatID(project, selectedType);
-    
-    // Step 10: Create the flat
-    Flat newFlat = new Flat(flatID, project, selectedType);
-    
-    // Step 11: Confirm booking
-    System.out.println("\n===== Booking Confirmation =====");
-    System.out.println("Applicant: " + applicant.getName() + " (" + applicant.getNRIC() + ")");
-    System.out.println("Project: " + project.getProjectName());
-    System.out.println("Flat Type: " + selectedType.getDisplayValue());
-    System.out.println("Flat ID: " + flatID);
-    
-    System.out.print("\nConfirm booking? (Y/N): ");
-    String confirmation = sc.nextLine();
-    
-    if (!confirmation.equalsIgnoreCase("Y")) {
-        System.out.println("Booking cancelled.");
-        System.out.println("Press Enter to continue...");
-        sc.nextLine();
-        return;
-    }
-    
-    // Step 12: Book the flat
-    boolean success = currentUser.bookFlat(application, newFlat);
-    
-    if (success) {
-        System.out.println("\nFlat booked successfully!");
-        System.out.println("Flat ID: " + newFlat.getFlatID());
-        System.out.println("Application status updated to: " + application.getStatus().getDisplayValue());
-        
-        // Step 13: Update project and application in the system
-        ProjectControl projectControl = new ProjectControl();
-        projectControl.updateProject(project);
-        
+        // Step 2: Find the successful application
         ApplicationControl applicationControl = new ApplicationControl();
-        applicationControl.updateApplication(application);
-        
-        // Step 14: Generate receipt
-        Receipt receipt = new Receipt("REC-" + application.getApplicationID(), application, currentUser);
-        System.out.println("\nReceipt generated with ID: " + receipt.getReceiptID());
-        
-        // Step 15: Ask if user wants to view the receipt
-        System.out.print("\nView receipt now? (Y/N): ");
-        String viewReceipt = sc.nextLine();
-        
-        if (viewReceipt.equalsIgnoreCase("Y")) {
-            System.out.println("\n" + receipt.generateFormattedReceipt());
-        }
-    } else {
-        System.out.println("\nFailed to book flat. Please check eligibility and availability.");
-    }
-    
-    System.out.println("\nPress Enter to continue...");
-    sc.nextLine();
-}
-
-/**
- * Generate a flat ID
- * @param project the project
- * @param flatType the flat type
- * @return a unique flat ID
- */
-private String generateFlatID(Project project, FlatType flatType) {
-    // Format: F-[ProjectID]-[FlatType]-[Sequential Number]
-    // Get sequential number based on total units minus available units plus 1
-    int sequentialNumber = project.getTotalUnitsByType(flatType) - 
-                          project.getAvailableUnitsByType(flatType) + 1;
-    
-    String typeCode = flatType == FlatType.TWO_ROOM ? "2R" : "3R";
-    
-    return "F-" + project.getProjectID() + "-" + typeCode + "-" + sequentialNumber;
-}
-    
-    /**
-     * Generate a receipt for a flat booking
-     * @param project the project
-     */
-    private void generateReceipt(Project project) {
-        ScreenUtil.clearScreen();
-        System.out.println("\n===== Generate Receipt =====");
-        System.out.println("Project: " + project.getProjectName());
-        
-        System.out.print("Enter applicant's NRIC: ");
-        String nric = sc.nextLine();
-        
-        if (nric.isEmpty()) {
-            System.out.println("Operation cancelled.");
-            System.out.println("Press Enter to continue...");
-            sc.nextLine();
-            return;
-        }
-        
-        Application application = currentUser.retrieveApplicationByNRIC(nric, project);
+        Application application = applicationControl.findApplicationByNRICAndProject(nric, project);
         
         if (application == null) {
-            System.out.println("No application found for NRIC: " + nric);
+            System.out.println("No successful application found for NRIC: " + nric + " in project " + project.getProjectName());
             System.out.println("Press Enter to continue...");
             sc.nextLine();
             return;
         }
         
-        if (application.getStatus() != ApplicationStatus.BOOKED || application.getBookedFlat() == null) {
-            System.out.println("This application does not have a booked flat.");
+        // Step 3: Validate application status
+        if (application.getStatus() != ApplicationStatus.SUCCESSFUL) {
+            System.out.println("This application is not in 'Successful' status and cannot be booked.");
             System.out.println("Current status: " + application.getStatus().getDisplayValue());
             System.out.println("Press Enter to continue...");
             sc.nextLine();
             return;
         }
         
-        // Generate and display receipt
-        ScreenUtil.clearScreen();
-        SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
+        // Step 4: Verify applicant eligibility and determine eligible flat types
+        Applicant applicant = application.getApplicant();
+        List<FlatType> availableFlatTypes = new ArrayList<>();
         
-        System.out.println("\n========================================");
-        System.out.println("           BOOKING RECEIPT             ");
-        System.out.println("========================================");
-        System.out.println("Receipt Date: " + dateFormat.format(new Date()));
-        System.out.println("Receipt ID: REC-" + application.getApplicationID());
+        if (applicant.getMaritalStatus() == MaritalStatus.SINGLE) {
+            // Singles can only apply for 2-Room at 35 or above
+            if (applicant.getAge() >= 35 && 
+                project.hasFlatType(FlatType.TWO_ROOM) && 
+                project.getAvailableUnitsByType(FlatType.TWO_ROOM) > 0) {
+                availableFlatTypes.add(FlatType.TWO_ROOM);
+            }
+        } else if (applicant.getMaritalStatus() == MaritalStatus.MARRIED) {
+            // Married applicants can apply for any available flat type from 21 or above
+            if (applicant.getAge() >= 21) {
+                if (project.hasFlatType(FlatType.TWO_ROOM) && 
+                    project.getAvailableUnitsByType(FlatType.TWO_ROOM) > 0) {
+                    availableFlatTypes.add(FlatType.TWO_ROOM);
+                }
+                if (project.hasFlatType(FlatType.THREE_ROOM) && 
+                    project.getAvailableUnitsByType(FlatType.THREE_ROOM) > 0) {
+                    availableFlatTypes.add(FlatType.THREE_ROOM);
+                }
+            }
+        }
         
-        System.out.println("\nAPPLICANT DETAILS");
-        System.out.println("Name: " + application.getApplicant().getName());
-        System.out.println("NRIC: " + application.getApplicant().getNRIC());
-        System.out.println("Age: " + application.getApplicant().getAge());
-        System.out.println("Marital Status: " + application.getApplicant().getMaritalStatusDisplayValue());
+        if (availableFlatTypes.isEmpty()) {
+            System.out.println("No eligible flat types available for this applicant.");
+            System.out.println("Press Enter to continue...");
+            sc.nextLine();
+            return;
+        }
         
-        System.out.println("\nPROJECT DETAILS");
-        System.out.println("Project Name: " + project.getProjectName());
-        System.out.println("Neighborhood: " + project.getNeighborhood());
+        // Step 5: Display available flat types
+        System.out.println("\nAvailable Flat Types:");
+        for (int i = 0; i < availableFlatTypes.size(); i++) {
+            FlatType type = availableFlatTypes.get(i);
+            System.out.println((i + 1) + ". " + type.getDisplayValue() + 
+                             " (" + project.getAvailableUnitsByType(type) + " units available)");
+        }
         
-        System.out.println("\nBOOKING DETAILS");
-        System.out.println("Application ID: " + application.getApplicationID());
-        System.out.println("Application Date: " + dateFormat.format(application.getApplicationDate()));
-        System.out.println("Flat Type: " + application.getBookedFlat().getType().getDisplayValue());
-        System.out.println("Flat ID: " + application.getBookedFlat().getFlatID());
+        // Step 6: Applicant selects flat type
+        System.out.print("\nSelect flat type (0 to cancel): ");
+        int typeChoice;
+        try {
+            typeChoice = Integer.parseInt(sc.nextLine());
+            if (typeChoice == 0) {
+                System.out.println("Booking cancelled.");
+                System.out.println("Press Enter to continue...");
+                sc.nextLine();
+                return;
+            }
+            
+            if (typeChoice < 1 || typeChoice > availableFlatTypes.size()) {
+                System.out.println("Invalid choice. Booking cancelled.");
+                System.out.println("Press Enter to continue...");
+                sc.nextLine();
+                return;
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("Invalid input. Booking cancelled.");
+            System.out.println("Press Enter to continue...");
+            sc.nextLine();
+            return;
+        }
         
-        System.out.println("\nThis receipt confirms the booking of the flat.");
-        System.out.println("Please keep for your records.");
-        System.out.println("========================================");
+        FlatType selectedType = availableFlatTypes.get(typeChoice - 1);
         
-        System.out.println("\nReceipt generated successfully!");
-        System.out.println("Press Enter to continue...");
+        // Step 7: Book the flat
+        HDBOfficerControl officerControl = new HDBOfficerControl();
+        boolean success = officerControl.bookFlatForApplicant(currentUser, application, selectedType);
+        
+        if (success) {
+            System.out.println("\nFlat booked successfully!");
+            
+            // Display booking details
+            Flat bookedFlat = application.getBookedFlat();
+            System.out.println("Project: " + project.getProjectName());
+            System.out.println("Applicant: " + applicant.getName());
+            System.out.println("Flat Type: " + selectedType.getDisplayValue());
+            System.out.println("Flat ID: " + bookedFlat.getFlatID());
+            
+            // Generate and display receipt
+            Receipt receipt = new Receipt("REC-" + application.getApplicationID(), application, currentUser);
+            System.out.println("\nReceipt Generated:");
+            System.out.println(receipt.generateFormattedReceipt());
+            
+        } else {
+            System.out.println("\nFailed to book flat. Please check eligibility and availability.");
+        }
+        
+        System.out.println("\nPress Enter to continue...");
         sc.nextLine();
     }
+
     
     /**
      * View and reply to enquiries

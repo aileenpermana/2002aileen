@@ -128,6 +128,30 @@ public class ProjectControl {
         return managerProjects;
     }
 
+    /**
+ * Update project units after a flat booking
+ * @param project the project being updated
+ * @param flatType the type of flat being booked
+ * @return true if update was successful, false otherwise
+ */
+    public boolean updateProjectUnitsAfterBooking(Project project, FlatType flatType) {
+        try {
+            // Decrement available units for the specific flat type
+            boolean decrementSuccessful = project.decrementAvailableUnits(flatType);
+            
+            if (!decrementSuccessful) {
+                System.err.println("Could not decrement units for project: " + project.getProjectName());
+                return false;
+            }
+            
+            // Save the updated project to CSV
+            return fileManager.updateProject(project);
+        } catch (Exception e) {
+            System.err.println("Error updating project units: " + e.getMessage());
+            return false;
+        }
+    }
+
         /**
      * Get projects handled by a specific officer
      * @param officer the HDB officer

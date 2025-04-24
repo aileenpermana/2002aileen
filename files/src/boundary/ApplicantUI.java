@@ -1516,11 +1516,20 @@ private void deleteEnquiry(List<Enquiry> enquiries) {
         System.out.println("Marital Status: " + currentUser.getMaritalStatusDisplayValue());
         System.out.println("Role: " + currentUser.getRole());
         
-        // Show booked flat if any
-        Flat bookedFlat = currentUser.getBookedFlat();
-        if (bookedFlat != null) {
+        List<Application> applications = currentUser.getApplications();
+        Application bookedApplication = null;
+
+        for (Application app : applications) {
+            if (app.getStatus() == ApplicationStatus.BOOKED) {
+                bookedApplication = app;
+                break;
+            }
+        }
+
+        if (bookedApplication != null && bookedApplication.getBookedFlat() != null) {
+            Flat bookedFlat = bookedApplication.getBookedFlat();
             System.out.println("\nBooked Flat Information:");
-            System.out.println("Project: " + bookedFlat.getProject().getProjectName());
+            System.out.println("Project: " + bookedApplication.getProject().getProjectName());
             System.out.println("Flat Type: " + bookedFlat.getType().getDisplayValue());
             System.out.println("Flat ID: " + bookedFlat.getFlatID());
         } else {
