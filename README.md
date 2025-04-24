@@ -1,4 +1,5 @@
 BTO Management System
+
 📝 Project Overview
 The BTO (Build-To-Order) Management System is a comprehensive Java application designed to streamline the process of managing Build-To-Order housing applications in Singapore. This system provides a robust platform for applicants, HDB officers, and managers to interact with BTO projects efficiently.
 🌟 Key Features
@@ -6,34 +7,34 @@ User Roles
 
 Applicant:
 
-View and apply for BTO projects
-Submit and manage enquiries
-Withdraw applications
+- View and apply for BTO projects
+- Submit and manage enquiries
+- Withdraw applications
 
 
 HDB Officer:
 
-Register for project management
-Book flats for successful applicants
-Manage project enquiries
+- Register for project management
+- Book flats for successful applicants
+- Manage project enquiries
 
 
 HDB Manager:
 
-Create and manage BTO projects
-Process officer registrations
-Approve/reject applications
-Generate detailed reports
+- Create and manage BTO projects
+- Process officer registrations
+- Approve/reject applications
+- Generate detailed reports
 
 
 
 System Capabilities
 
-User authentication with NRIC-based login
-Detailed project filtering and searching
-Strict eligibility checks for applications
-Comprehensive enquiry management
-Flat booking and allocation system
+- User authentication with NRIC-based login
+- Detailed project filtering and searching
+- Strict eligibility checks for applications
+- Comprehensive enquiry management
+- Flat booking and allocation system
 
 🛠 Technical Requirements
 Prerequisites
@@ -47,22 +48,7 @@ Windows
 macOS
 Linux
 
-📦 Project Structure
-bto-management-system/
-│
-├── src/
-│   ├── boundary/       # User interface classes
-│   ├── control/        # Business logic controllers
-│   ├── entity/         # Domain model classes
-│   └── utils/          # Utility classes
-│
-├── resources/          # Data files
-│   ├── ApplicantList.csv
-│   ├── ManagerList.csv
-│   ├── OfficerList.csv
-│   └── ProjectList.csv
-│
-└── README.md
+
 🚀 Getting Started
 Installation
 
