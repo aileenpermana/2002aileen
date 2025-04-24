@@ -1,6 +1,7 @@
 package entity;
 
 import control.HDBOfficerControl;
+import control.ProjectControl;
 import java.util.*;
 
 /**
@@ -148,7 +149,6 @@ public class Project {
         availableUnits.put(type, count);
         
         // Log the update for debugging
-        System.out.println("Set available units for " + type.getDisplayValue() + " to " + count);
     }
     
     
@@ -169,6 +169,9 @@ public class Project {
         // Log the update for debugging
         System.out.println("Decremented available units for " + type.getDisplayValue() + 
                          " from " + available + " to " + newAvailable);
+        
+        ProjectControl projectControl = new ProjectControl();
+        projectControl.updateProjectUnitsAfterBooking(this, type);
         
         return true;
     }

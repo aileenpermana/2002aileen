@@ -637,25 +637,17 @@ private boolean addUserToOfficerFile(HDBOfficer officer) {
             return false;
         }
     
-        // Print project state before making changes
-        System.out.println("Project state BEFORE booking:");
-        project.printProjectState();
+        
     
         // Generate a new Flat object
         String flatID = generateFlatID(project, flatType);
         Flat bookedFlat = new Flat(flatID, project, flatType);
         System.out.println("Generated flat ID: " + flatID);
     
-        // Update project's available units
-        boolean decrementSuccess = project.decrementAvailableUnits(flatType);
-        if (!decrementSuccess) {
-            System.out.println("Failed to decrement available units");
-            return false;
-        }
+        project.setAvailableUnitsByType(flatType, availableUnits - 1);
         
-        // Print project state after decrementing
-        System.out.println("Project state AFTER decrementing:");
-        project.printProjectState();
+        
+        
     
         // Update application status to BOOKED
         application.setStatus(ApplicationStatus.BOOKED);

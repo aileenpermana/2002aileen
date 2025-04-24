@@ -419,8 +419,6 @@ public boolean withdrawApplication(Application application) {
                     String line = fileScanner.nextLine().trim();
                     if (line.isEmpty()) continue;
                     
-                    // Log the line we're trying to parse for debugging
-                    System.out.println("Loading application from line: " + line);
                     
                     String[] values = line.split(",");
                     if (values.length < 6) {
@@ -442,10 +440,7 @@ public boolean withdrawApplication(Application application) {
                         ApplicationStatus status;
                         try {
                             status = ApplicationStatus.valueOf(statusStr);
-                            if (status == ApplicationStatus.WITHDRAW || status == ApplicationStatus.UNSUCCESSFUL) {
-                                System.out.println("Found application with important status: " + applicationID + 
-                                                  " - Status: " + status);
-                            }
+                            
                         } catch (IllegalArgumentException e) {
                             System.err.println("ERROR: Invalid status in application: " + statusStr);
                             System.err.println("Defaulting to PENDING status");
@@ -593,8 +588,7 @@ public boolean withdrawApplication(Application application) {
                     // Create a debug string to log special statuses
                     if (app.getStatus() == ApplicationStatus.WITHDRAW || 
                         app.getStatus() == ApplicationStatus.UNSUCCESSFUL) {
-                        System.out.println("Saving application with status: " + app.getStatus() + 
-                                         " - ID: " + app.getApplicationID());
+                        
                     }
                     
                     StringBuilder sb = new StringBuilder();
