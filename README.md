@@ -42,6 +42,23 @@ Prerequisites
 Java 17 or higher
 No additional external libraries required
 
+📦 Project Structure
+bto-management-system/
+│
+├── src/
+│   ├── boundary/       # User interface classes
+│   ├── control/        # Business logic controllers
+│   ├── entity/         # Domain model classes
+│   └── utils/          # Utility classes
+│
+├── resources/          # Data files
+│   ├── ApplicantList.csv
+│   ├── ManagerList.csv
+│   ├── OfficerList.csv
+│   └── ProjectList.csv
+│
+└── README.md
+
 Supported Platforms
 
 Windows
