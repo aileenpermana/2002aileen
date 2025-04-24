@@ -9,27 +9,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Represents an HDB Manager in the BTO system.
- * Extends the User class with manager-specific functionality.
- * Demonstrates inheritance (extends User) and method overriding.
- */
+
 public class HDBManager extends User {
-    private String managerID;
+    private final String managerID;
     private List<Project> managingProjects;
     
-    /**
-     * Constructor with MaritalStatus enum
-     */
+    
     public HDBManager(String name, String NRIC, String password, int age, MaritalStatus maritalStatus, String role) {
         super(name, NRIC, password, age, maritalStatus, role);
         this.managerID = "HM" + NRIC.substring(1, 8);
         this.managingProjects = new ArrayList<>();
     }
     
-    /**
-     * Constructor with marital status as String
-     */
+    
     public HDBManager(String name, String NRIC, String password, int age, String maritalStatus, String role) {
         super(name, NRIC, password, age, maritalStatus, role);
         this.managerID = "HM" + NRIC.substring(1, 8);
@@ -303,7 +295,7 @@ public boolean processOfficerRegistration(User user, Project project, boolean ap
         
         return null;
     }
-    
+
     public boolean processWithdrawalRequest(Application application, boolean approve) {
         Project project = application.getProject();
         

@@ -4,26 +4,19 @@ import control.ApplicationControl;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Represents an Applicant in the BTO system.
- * Extends the User class with additional applicant-specific functionality.
- */
+
 public class Applicant extends User {
     private List<Application> applications;
     private Flat bookedFlat;
     
-    /**
-     * Constructor with MaritalStatus enum
-     */
+    
     public Applicant(String name, String NRIC, String password, int age, MaritalStatus maritalStatus, String role) {
         super(name, NRIC, password, age, maritalStatus, role);
         this.applications = new ArrayList<>();
         this.bookedFlat = null;
     }
     
-    /**
-     * Constructor with marital status as String
-     */
+   
     public Applicant(String name, String NRIC, String password, int age, String maritalStatus, String role) {
         super(name, NRIC, password, age, maritalStatus, role);
         this.applications = new ArrayList<>();

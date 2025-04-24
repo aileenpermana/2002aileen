@@ -5,16 +5,14 @@ package entity;
  * Represents common attributes and behavior for all user types.
  */
 public class User {
-    private String name;
-    private String NRIC;
+    private final String name;
+    private final String NRIC;
     private String password;
-    private int age;
-    private MaritalStatus maritalStatus;
+    private final int age;
+    private final MaritalStatus maritalStatus;
     private String role;
 
-    /**
-     * Constructor for User object with MaritalStatus enum
-     */
+    
     public User(String name, String NRIC, String password, int age, MaritalStatus maritalStatus, String role) {
         this.name = name;
         this.NRIC = NRIC;
@@ -24,9 +22,6 @@ public class User {
         this.role = role;
     }
     
-    /**
-     * Overloaded constructor that accepts marital status as String
-     */
     public User(String name, String NRIC, String password, int age, String maritalStatusStr, String role) {
         this.name = name;
         this.NRIC = NRIC;

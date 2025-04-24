@@ -4,25 +4,15 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
-/**
- * Represents an HDB Officer in the BTO system.
- * Extends the User class with officer-specific functionality.
- */
 public class HDBOfficer extends User {
     private String officerID;
     private List<Project> handlingProjects;
     
-    /**
-     * Constructor with MaritalStatus enum
-     */
     public HDBOfficer(String name, String NRIC, String password, int age, MaritalStatus maritalStatus, String role) {
         super(name, NRIC, password, age, maritalStatus, role);
         this.handlingProjects = new ArrayList<>();
     }
     
-    /**
-     * Constructor with marital status as String
-     */
     public HDBOfficer(String name, String NRIC, String password, int age, String maritalStatus, String role) {
         super(name, NRIC, password, age, maritalStatus, role);
         this.handlingProjects = new ArrayList<>();

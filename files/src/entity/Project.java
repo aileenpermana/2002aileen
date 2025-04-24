@@ -21,17 +21,7 @@ public class Project {
     private int availableOfficerSlots;
     private boolean isVisible;
     
-    /**
-     * Constructor for Project
-     * @param projectID unique project ID
-     * @param projectName name of the project
-     * @param neighborhood neighborhood location
-     * @param totalUnits map of flat types to unit counts
-     * @param openDate application opening date
-     * @param closeDate application closing date
-     * @param manager manager in charge
-     * @param officerSlots maximum number of officer slots
-     */
+    
     public Project(String projectID, String projectName, String neighborhood,
                    Map<FlatType, Integer> totalUnits, Date openDate, Date closeDate,
                    HDBManager manager, int officerSlots) {
@@ -48,59 +38,34 @@ public class Project {
         this.availableOfficerSlots = officerSlots;
         this.isVisible = true; // Default to visible
     }
-    
-    /**
-     * Get the project ID
-     * @return project ID
-     */
+
     public String getProjectID() {
         return projectID;
     }
-    
-    /**
-     * Get the project name
-     * @return project name
-     */
+
     public String getProjectName() {
         return projectName;
     }
     
-    /**
-     * Set the project name
-     * @param projectName new project name
-     */
     public void setProjectName(String projectName) {
         this.projectName = projectName;
     }
     
-    /**
-     * Get the neighborhood
-     * @return neighborhood
-     */
     public String getNeighborhood() {
         return neighborhood;
     }
     
-    /**
-     * Set the neighborhood
-     * @param neighborhood new neighborhood
-     */
+
     public void setNeighborhood(String neighborhood) {
         this.neighborhood = neighborhood;
     }
     
-    /**
-     * Get all flat types in this project
-     * @return set of flat types
-     */
+
     public Set<FlatType> getFlatTypes() {
         return totalUnits.keySet();
     }
     
-    /**
-     * Get all flat types in this project as a List
-     * @return list of flat types
-     */
+
     public List<FlatType> getFlatTypesList() {
         return new ArrayList<>(totalUnits.keySet());
     }
