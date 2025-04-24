@@ -3,6 +3,7 @@ package control;
 import entity.*;
 import java.util.*;
 import utils.ProjectFileManager;
+import utils.filters.*;
 
 /**
  * Control class for managing Project operations in the BTO system.
@@ -11,11 +12,19 @@ import utils.ProjectFileManager;
 public class ProjectControl {
     private ProjectFileManager fileManager;
     
+    private NeighborhoodFilterable<Project> neighborhoodFilter;
+    private FlatTypeFilterable<Project> flatTypeFilter;
+    private ManagerFilterable<Project> managerFilter;
+
     /**
      * Constructor for ProjectControl
      */
     public ProjectControl() {
         this.fileManager = ProjectFileManager.getInstance();
+        ProjectFilter filter = new ProjectFilter();
+        this.neighborhoodFilter = filter;
+        this.flatTypeFilter = filter;
+        this.managerFilter = filter;
     }
     
     /**
@@ -62,34 +71,6 @@ public List<Project> getVisibleEligibleProjects(User user) {
     
     return visibleEligibleProjects;
 }
-
-
-    
-    /**
-     * Apply filters to a list of projects
-     * @param projects the projects to filter
-     * @param filters the filters to apply
-     * @return filtered list of projects
-     */
-    private List<Project> applyFilters(List<Project> projects, Map<String, Object> filters) {
-        List<Project> filteredProjects = new ArrayList<>(projects);
-        
-        // Neighborhood filter
-        if (filters.containsKey("neighborhood")) {
-            String neighborhood = (String) filters.get("neighborhood");
-            filteredProjects.removeIf(p -> !p.getNeighborhood().equalsIgnoreCase(neighborhood));
-        }
-        
-        // Flat type filter
-        if (filters.containsKey("flatType")) {
-            FlatType flatType = (FlatType) filters.get("flatType");
-            filteredProjects.removeIf(p -> !p.getFlatTypes().contains(flatType));
-        }
-        
-        // Add more filters as needed
-        
-        return filteredProjects;
-    }
     
     /**
      * Get projects created by a specific manager
@@ -194,41 +175,7 @@ public boolean toggleVisibility(Project project, boolean visible) {
     return updateProject(project);
 }
 
-    /**
- * Filter projects by neighborhood
- * @param projects the list of projects to filter
- * @param neighborhood the neighborhood to filter by
- * @return filtered list of projects
- */
-public List<Project> filterByNeighborhood(List<Project> projects, String neighborhood) {
-    List<Project> filtered = new ArrayList<>();
-    
-    for (Project project : projects) {
-        if (project.getNeighborhood().equalsIgnoreCase(neighborhood)) {
-            filtered.add(project);
-        }
-    }
-    
-    return filtered;
-}
 
-/**
- * Filter projects by flat type
- * @param projects the list of projects to filter
- * @param flatType the flat type to filter by
- * @return filtered list of projects
- */
-public List<Project> filterByFlatType(List<Project> projects, FlatType flatType) {
-    List<Project> filtered = new ArrayList<>();
-    
-    for (Project project : projects) {
-        if (project.hasFlatType(flatType)) {
-            filtered.add(project);
-        }
-    }
-    
-    return filtered;
-}
 
 /**
  * Filter projects by start date
@@ -366,79 +313,21 @@ private int calculateTotalAvailableUnits(Project project) {
  * Enhanced project filtering methods for ProjectControl
  */
 
-/**
- * Filter projects based on various criteria
- * @param projects the list of projects to filter
- * @param filters a map of filter criteria
- * @return filtered list of projects
- */
-public List<Project> filterProjects(List<Project> projects, Map<String, Object> filters) {
-    if (filters == null || filters.isEmpty()) {
-        return new ArrayList<>(projects);
-    }
-    
-    List<Project> filteredProjects = new ArrayList<>(projects);
-    
-    // Filter by neighborhood
-    if (filters.containsKey("neighborhood")) {
-        String neighborhood = (String) filters.get("neighborhood");
-        if (neighborhood != null && !neighborhood.isEmpty()) {
-            filteredProjects = filterByNeighborhood(filteredProjects, neighborhood);
-        }
-    }
-    
-    // Filter by flat type
-    if (filters.containsKey("flatType")) {
-        String flatTypeStr = (String) filters.get("flatType");
-        if (flatTypeStr != null && !flatTypeStr.isEmpty()) {
-            FlatType flatType = FlatType.fromDisplayValue(flatTypeStr);
-            if (flatType != null) {
-                filteredProjects = filterByFlatType(filteredProjects, flatType);
-            }
-        }
-    }
-    
-    // Filter by application period
-    if (filters.containsKey("startDate")) {
-        Date startDate = (Date) filters.get("startDate");
-        if (startDate != null) {
-            filteredProjects = filterByStartDate(filteredProjects, startDate);
-        }
-    }
-    
-    if (filters.containsKey("endDate")) {
-        Date endDate = (Date) filters.get("endDate");
-        if (endDate != null) {
-            filteredProjects = filterByEndDate(filteredProjects, endDate);
-        }
-    }
-    
-    // Filter by availability
-    if (filters.containsKey("minAvailability")) {
-        Integer minAvailability = (Integer) filters.get("minAvailability");
-        if (minAvailability != null && minAvailability > 0) {
-            filteredProjects = filterByMinAvailability(filteredProjects, minAvailability);
-        }
-    }
-    
-    // Filter by manager
-    if (filters.containsKey("manager")) {
-        HDBManager manager = (HDBManager) filters.get("manager");
-        if (manager != null) {
-            filteredProjects = filterByManager(filteredProjects, manager);
-        }
-    }
-    
-    // Sort projects if sortBy is specified
-    if (filters.containsKey("sortBy")) {
-        String sortBy = (String) filters.get("sortBy");
-        if (sortBy != null && !sortBy.isEmpty()) {
-            filteredProjects = sortProjects(filteredProjects, sortBy);
-        }
-    }
-    
-    return filteredProjects;
+ 
+
+public List<Project> filterByNeighborhood(List<Project> projects, String neighborhood) {
+    return neighborhoodFilter.filterByNeighborhood(projects, neighborhood);
 }
+
+public List<Project> filterByFlatType(List<Project> projects, FlatType flatType) {
+    return flatTypeFilter.filterByFlatType(projects, flatType);
+}
+
+public List<Project> filterProjectsByManager(List<Project> projects, HDBManager manager) {
+    // Cast to access the specific interface method
+    return (managerFilter.filterByManager(projects, manager));
+}
+
 
 
 }
