@@ -634,6 +634,10 @@ private boolean addUserToOfficerFile(HDBOfficer officer) {
             return false;
         }
     
+        // Print project state before making changes
+        System.out.println("Project state BEFORE booking:");
+        project.printProjectState();
+    
         // Generate a new Flat object
         String flatID = generateFlatID(project, flatType);
         Flat bookedFlat = new Flat(flatID, project, flatType);
@@ -646,11 +650,14 @@ private boolean addUserToOfficerFile(HDBOfficer officer) {
             return false;
         }
         
-        System.out.println("Available units after decrement: " + project.getAvailableUnitsByType(flatType));
+        // Print project state after decrementing
+        System.out.println("Project state AFTER decrementing:");
+        project.printProjectState();
     
         // Update application status to BOOKED
         application.setStatus(ApplicationStatus.BOOKED);
         application.setBookedFlat(bookedFlat);
+        application.setStatusUpdateDate(new Date());
     
         // Update applicant's booked flat
         applicant.setBookedFlat(bookedFlat);
@@ -666,14 +673,16 @@ private boolean addUserToOfficerFile(HDBOfficer officer) {
             System.out.println("Failed to update application");
         }
         
-        // Update project units and save to CSV
+        // Update project in CSV
         ProjectControl projectControl = new ProjectControl();
-        boolean projectUnitsUpdated = projectControl.updateProjectUnitsAfterBooking(project, flatType);
+        boolean projectUpdated = projectControl.updateProject(project);
         
-        System.out.println("Project units updated: " + projectUnitsUpdated);
+        // Print final state for verification
+        System.out.println("Final project state:");
+        project.printProjectState();
+        System.out.println("Project units updated in CSV: " + projectUpdated);
     
-        // Generate receipt
-        if (applicationSaved && projectUnitsUpdated) {
+        if (applicationSaved && projectUpdated) {
             return true;
         }
     

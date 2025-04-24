@@ -530,60 +530,65 @@ public class ManagerUI {
     }
     
     /**
-     * Toggle project visibility
-     */
-    private void toggleProjectVisibility() {
-        ScreenUtil.clearScreen();
-        System.out.println("\n===== Toggle Project Visibility =====");
-        
-        // Get all projects managed by this manager
-        List<Project> managedProjects = currentUser.getManagedProjects();
-        
-        if (managedProjects.isEmpty()) {
-            System.out.println("You are not currently managing any projects.");
-            System.out.println("Press Enter to continue...");
-            sc.nextLine();
-            return;
-        }
-        
-        // Display the list of managed projects with their visibility status
-        System.out.println("Current Project Visibility:");
-        for (int i = 0; i < managedProjects.size(); i++) {
-            Project p = managedProjects.get(i);
-            System.out.println((i + 1) + ". " + p.getProjectName() + " - " + 
-                             (p.isVisible() ? "Visible" : "Hidden"));
-        }
-        
-        System.out.print("\nEnter project number to toggle visibility (0 to cancel): ");
-        int projectChoice;
-        try {
-            projectChoice = Integer.parseInt(sc.nextLine());
-            if (projectChoice == 0) {
-                return;
-            }
-            
-            if (projectChoice < 1 || projectChoice > managedProjects.size()) {
-                System.out.println("Invalid project number. Press Enter to continue.");
-                sc.nextLine();
-                return;
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Invalid input. Press Enter to continue.");
-            sc.nextLine();
-            return;
-        }
-        
-        Project selectedProject = managedProjects.get(projectChoice - 1);
-        boolean currentVisibility = selectedProject.isVisible();
-        
-        // Toggle visibility
-        currentUser.toggleVisibility(selectedProject, !currentVisibility);
-        
-        System.out.println("\nProject '" + selectedProject.getProjectName() + "' is now " + 
-                         (selectedProject.isVisible() ? "visible" : "hidden") + " to applicants.");
+ * Toggle project visibility
+ */
+private void toggleProjectVisibility() {
+    ScreenUtil.clearScreen();
+    System.out.println("\n===== Toggle Project Visibility =====");
+    
+    // Get all projects managed by this manager
+    List<Project> managedProjects = currentUser.getManagedProjects();
+    
+    if (managedProjects.isEmpty()) {
+        System.out.println("You are not currently managing any projects.");
         System.out.println("Press Enter to continue...");
         sc.nextLine();
+        return;
     }
+    
+    // Display the list of managed projects with their visibility status
+    System.out.println("Current Project Visibility:");
+    for (int i = 0; i < managedProjects.size(); i++) {
+        Project p = managedProjects.get(i);
+        System.out.println((i + 1) + ". " + p.getProjectName() + " - " + 
+                         (p.isVisible() ? "Visible" : "Hidden"));
+    }
+    
+    System.out.print("\nEnter project number to toggle visibility (0 to cancel): ");
+    int projectChoice;
+    try {
+        projectChoice = Integer.parseInt(sc.nextLine());
+        if (projectChoice == 0) {
+            return;
+        }
+        
+        if (projectChoice < 1 || projectChoice > managedProjects.size()) {
+            System.out.println("Invalid project number. Press Enter to continue.");
+            sc.nextLine();
+            return;
+        }
+    } catch (NumberFormatException e) {
+        System.out.println("Invalid input. Press Enter to continue.");
+        sc.nextLine();
+        return;
+    }
+    
+    Project selectedProject = managedProjects.get(projectChoice - 1);
+    boolean currentVisibility = selectedProject.isVisible();
+    
+    // Toggle visibility
+    boolean success = currentUser.toggleVisibility(selectedProject, !currentVisibility);
+    
+    if (success) {
+        System.out.println("\nProject '" + selectedProject.getProjectName() + "' is now " + 
+                        (selectedProject.isVisible() ? "visible" : "hidden") + " to applicants.");
+    } else {
+        System.out.println("\nFailed to toggle visibility for project '" + 
+                        selectedProject.getProjectName() + "'.");
+    }
+    System.out.println("Press Enter to continue...");
+    sc.nextLine();
+}
     
     /**
      * View projects (all or filtered by manager)

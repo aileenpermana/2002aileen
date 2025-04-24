@@ -45,44 +45,25 @@ public class ProjectControl {
     }
     
     /**
-     * Get visible projects for a user
-     * @param user the user
-     * @param filters optional filters
-     * @return list of visible projects
-     */
-    public List<Project> getVisibleProjectsForUser(User user, Map<String, Object> filters) {
-        List<Project> allProjects = getAllProjects();
-        List<Project> visibleProjects = new ArrayList<>();
-        
-        for (Project project : allProjects) {
-            // Managers can see all projects
-            if (user instanceof HDBManager) {
-                visibleProjects.add(project);
-                continue;
-            }
-            
-            // Officers can see projects they are handling, regardless of visibility
-            if (user instanceof HDBOfficer) {
-                HDBOfficer officer = (HDBOfficer) user;
-                if (officer.isHandlingProject(project)) {
-                    visibleProjects.add(project);
-                    continue;
-                }
-            }
-            
-            // For all users, check visibility and eligibility
-            if (project.isVisible() && project.checkEligibility(user, project.getProjectID())) {
-                visibleProjects.add(project);
-            }
+ * Get visible and eligible projects for a user
+ * @param user the user
+ * @return list of projects the user is eligible for and are visible
+ */
+public List<Project> getVisibleEligibleProjects(User user) {
+    List<Project> allProjects = getAllProjects();
+    List<Project> visibleEligibleProjects = new ArrayList<>();
+    
+    for (Project project : allProjects) {
+        // Make sure the project is visible AND the user is eligible
+        if (project.isVisible() && project.checkEligibility(user, project.getProjectID())) {
+            visibleEligibleProjects.add(project);
         }
-        
-        // Apply filters if provided
-        if (filters != null && !filters.isEmpty()) {
-            visibleProjects = applyFilters(visibleProjects, filters);
-        }
-        
-        return visibleProjects;
     }
+    
+    return visibleEligibleProjects;
+}
+
+
     
     /**
      * Apply filters to a list of projects
@@ -203,15 +184,15 @@ public class ProjectControl {
     }
     
     /**
-     * Toggle the visibility of a project
-     * @param project the project
-     * @param visible the new visibility
-     * @return true if toggle was successful, false otherwise
-     */
-    public boolean toggleVisibility(Project project, boolean visible) {
-        project.setVisible(visible);
-        return updateProject(project);
-    }
+ * Toggle the visibility of a project
+ * @param project the project
+ * @param visible the new visibility state
+ * @return true if toggle was successful, false otherwise
+ */
+public boolean toggleVisibility(Project project, boolean visible) {
+    project.setVisible(visible);
+    return updateProject(project);
+}
 
     /**
  * Filter projects by neighborhood
